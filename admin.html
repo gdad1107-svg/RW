@@ -780,6 +780,8 @@ document.getElementById("btn-submit-txns").addEventListener("click", async funct
     btn.textContent = "Save transactions";
   }
 });
+
+function getVisitDate(v){
   if(!v.visitedAt) return null;
   return v.visitedAt.toDate ? v.visitedAt.toDate() : new Date(v.visitedAt);
 }
