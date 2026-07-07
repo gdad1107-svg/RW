@@ -1,13 +1,13 @@
 {
-  "name": "PisoPoints Rewards",
-  "short_name": "PisoPoints",
+  "name": "Pabling's Pogi Points",
+  "short_name": "Pogi Points",
   "description": "Look up or register a member by mobile number and add rewards points for every purchase.",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#EAF2FE",
-  "theme_color": "#1360D9",
+  "background_color": "#141311",
+  "theme_color": "#B7945A",
   "icons": [
     {
       "src": "icons/icon-192.png",
