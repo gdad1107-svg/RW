@@ -11,7 +11,7 @@
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
   import {
-    getFirestore, collection, getDocs, query, orderBy
+    getFirestore, collection, getDocs, query, orderBy, doc, updateDoc
   } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
 
   // Same project config as index.html
@@ -26,7 +26,7 @@
 
   const app = initializeApp(firebaseConfig);
   const firestoreDb = getFirestore(app);
-  window.__firebase = { firestoreDb, collection, getDocs, query, orderBy };
+  window.__firebase = { firestoreDb, collection, getDocs, query, orderBy, doc, updateDoc };
 </script>
 <style>
   :root{
@@ -328,6 +328,13 @@
   </div>
 </header>
 
+<div id="repair-banner" style="display:none; max-width:1000px; margin:16px auto 0; padding:0 16px;">
+  <div style="background:#FFF4E0; border:1px solid #F0D6A6; border-radius:12px; padding:14px 18px; display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap;">
+    <span style="font-size:13px; color:#B26A00;" id="repair-message"></span>
+    <button id="btn-repair" style="width:auto; height:36px; padding:0 16px; font-size:13px; background:#B26A00; color:white; border-radius:8px; border:none; cursor:pointer;">Recalculate totals</button>
+  </div>
+</div>
+
 <main>
   <div class="report-section">
     <p class="report-title">Barber performance</p>
@@ -412,6 +419,7 @@ async function loadClients(){
     renderBarberReport(clients);
     renderFrequencyReport(clients);
     renderList();
+    checkForMismatches(clients);
   } catch(e){
     console.error(e);
     container.innerHTML = "<p class='empty-state'>Couldn't load client data. Check your connection and Firestore rules.</p>";
@@ -660,6 +668,49 @@ document.addEventListener("click", function(e){
 
 document.getElementById("search-input").addEventListener("input", renderList);
 document.getElementById("sort-select").addEventListener("change", renderList);
+
+function findMismatchedClients(clients){
+  return clients.filter(function(c){
+    var visitSum = c.visits.reduce(function(sum, v){ return sum + (v.pointsEarned || 0); }, 0);
+    return visitSum !== c.totalRewards;
+  });
+}
+
+function checkForMismatches(clients){
+  var mismatched = findMismatchedClients(clients);
+  var banner = document.getElementById("repair-banner");
+  var message = document.getElementById("repair-message");
+  if(mismatched.length === 0){
+    banner.style.display = "none";
+    return;
+  }
+  message.textContent = mismatched.length + " client" + (mismatched.length > 1 ? "s have" : " has") +
+    " a points total that doesn't match their recorded visit history (likely from purchases saved before visit tracking was added). You can recalculate to fix this.";
+  banner.style.display = "block";
+}
+
+document.getElementById("btn-repair").addEventListener("click", async function(){
+  var fb = window.__firebase;
+  var btn = this;
+  var mismatched = findMismatchedClients(allClients);
+  btn.disabled = true;
+  btn.textContent = "Fixing...";
+  try{
+    for(var i = 0; i < mismatched.length; i++){
+      var c = mismatched[i];
+      var correctTotal = c.visits.reduce(function(sum, v){ return sum + (v.pointsEarned || 0); }, 0);
+      var memberRef = fb.doc(fb.firestoreDb, "members", c.id);
+      await fb.updateDoc(memberRef, { totalRewards: correctTotal });
+    }
+    document.getElementById("repair-banner").style.display = "none";
+    await loadClients();
+  } catch(e){
+    console.error(e);
+    btn.textContent = "Retry recalculate";
+    btn.disabled = false;
+    return;
+  }
+});
 
 window.addEventListener("DOMContentLoaded", loadClients);
 </script>

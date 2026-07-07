@@ -24,7 +24,7 @@
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
   import {
     getFirestore, doc, getDoc, setDoc, updateDoc, increment,
-    collection, addDoc, serverTimestamp, getDocs, query, where
+    collection, addDoc, serverTimestamp, getDocs, query, where, writeBatch
   } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
 
   const firebaseConfig = {
@@ -43,7 +43,7 @@
   // since this block runs as an ES module and the rest of the page doesn't.
   window.__firebase = {
     firestoreDb, doc, getDoc, setDoc, updateDoc, increment,
-    collection, addDoc, serverTimestamp, getDocs, query, where
+    collection, addDoc, serverTimestamp, getDocs, query, where, writeBatch
   };
 
   // Populate the barber autocomplete list from previously used names
@@ -576,21 +576,24 @@ document.getElementById("btn-add").addEventListener("click", async function(){
 
   var fb = window.__firebase;
   var earned = Math.round(amt / 20);
+  var barber = barberInput.value.trim();
   setButtonLoading(btn, true, "Add to rewards");
   try{
     var memberRef = fb.doc(fb.firestoreDb, "members", currentNumber);
-    await fb.updateDoc(memberRef, {
-      totalRewards: fb.increment(earned)
-    });
-    // Save this visit as its own timestamped record so visit frequency and
-    // barber history can be reviewed later, e.g. members/{mobileNumber}/visits
     var visitsRef = fb.collection(fb.firestoreDb, "members", currentNumber, "visits");
-    await fb.addDoc(visitsRef, {
+    var newVisitRef = fb.doc(visitsRef);
+
+    var batch = fb.writeBatch(fb.firestoreDb);
+    batch.update(memberRef, { totalRewards: fb.increment(earned) });
+    batch.set(newVisitRef, {
       amount: amt,
       pointsEarned: earned,
       barber: barber,
       visitedAt: fb.serverTimestamp()
     });
+    // Both writes commit together, or neither does — prevents the total
+    // and the visit history from ever drifting apart.
+    await batch.commit();
 
     // Save/update this barber name so it appears as a suggestion next time,
     // keyed by a normalized version of the name to avoid duplicate entries
