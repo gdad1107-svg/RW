@@ -42,6 +42,17 @@
   // since this block runs as an ES module and the rest of the page doesn't.
   window.__firebase = { firestoreDb, doc, getDoc, setDoc, updateDoc, increment };
 </script>
+
+<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+<script>
+  // ---- EmailJS setup ----
+  // 1. Sign up free at emailjs.com, connect an email service (e.g. Gmail), and create a template.
+  // 2. Replace the three values below with your own Public Key, Service ID, and Template ID.
+  var EMAILJS_PUBLIC_KEY = "YOUR_PUBLIC_KEY";
+  var EMAILJS_SERVICE_ID = "YOUR_SERVICE_ID";
+  var EMAILJS_TEMPLATE_ID = "YOUR_TEMPLATE_ID";
+  emailjs.init(EMAILJS_PUBLIC_KEY);
+</script>
 <style>
   :root{
     --navy:#0B2545;
@@ -301,6 +312,7 @@
       <p class="error-text" id="phone-error"></p>
     </div>
     <button class="btn-primary" id="btn-phone">Continue</button>
+    <p class="helper-note">Demo tip: try 09171234567 for an existing member, or any other 11-digit number to register as new</p>
   </div>
 
   <!-- Screen 2: New member registration -->
@@ -323,6 +335,10 @@
     <div class="field">
       <label for="city-input">City address</label>
       <input id="city-input" type="text" placeholder="Marikina City" autocomplete="off">
+    </div>
+    <div class="field">
+      <label for="email-input">Email address <span style="font-weight:400; color:var(--gray);">(optional)</span></label>
+      <input id="email-input" type="email" placeholder="juan@email.com" autocomplete="off">
     </div>
     <p class="error-text" id="new-error"></p>
     <button class="btn-primary" id="btn-register">Register</button>
@@ -369,6 +385,8 @@
 // Collection: "members", document ID = mobile number, fields: firstName, lastName, city, totalRewards
 var currentNumber = null;
 var currentTotalRewards = 0;
+var currentEmail = null;
+var currentFirstName = "";
 
 function show(id){
   ["screen-phone","screen-new","screen-purchase","screen-confirm"].forEach(function(s){
@@ -409,6 +427,8 @@ document.getElementById("btn-phone").addEventListener("click", async function(){
     if(snap.exists()){
       var record = snap.data();
       currentTotalRewards = record.totalRewards || 0;
+      currentEmail = record.email || null;
+      currentFirstName = record.firstName || "";
       greeting.textContent = "Welcome back, " + record.firstName;
       badgeRow.style.display = "flex";
       badge.textContent = "Current points: " + currentTotalRewards.toLocaleString();
@@ -428,10 +448,15 @@ document.getElementById("btn-register").addEventListener("click", async function
   var first = document.getElementById("firstname-input").value.trim();
   var last = document.getElementById("lastname-input").value.trim();
   var city = document.getElementById("city-input").value.trim();
+  var email = document.getElementById("email-input").value.trim();
   var err = document.getElementById("new-error");
   var btn = this;
   if(!first || !last || !city){
     err.textContent = "All fields are required";
+    return;
+  }
+  if(email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){
+    err.textContent = "Enter a valid email address, or leave it blank";
     return;
   }
   err.textContent = "";
@@ -444,9 +469,12 @@ document.getElementById("btn-register").addEventListener("click", async function
       lastName: last,
       mobileNumber: currentNumber,
       city: city,
+      email: email || null,
       totalRewards: 0
     });
     currentTotalRewards = 0;
+    currentEmail = email || null;
+    currentFirstName = first;
     var greeting = document.getElementById("purchase-greeting");
     greeting.textContent = "Registration complete, " + first;
     document.getElementById("badge-row").style.display = "none";
@@ -484,6 +512,16 @@ document.getElementById("btn-add").addEventListener("click", async function(){
       "You earned <b>" + earned.toLocaleString() + " points</b> from this PHP " + amt.toLocaleString() + " purchase";
     document.getElementById("total-points").textContent = newTotal.toLocaleString();
     show("screen-confirm");
+
+    if(currentEmail && EMAILJS_PUBLIC_KEY !== "YOUR_PUBLIC_KEY"){
+      emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, {
+        to_email: currentEmail,
+        first_name: currentFirstName,
+        amount: amt.toLocaleString(),
+        points_earned: earned.toLocaleString(),
+        total_points: newTotal.toLocaleString()
+      }).catch(function(e){ console.error("Email send failed:", e); });
+    }
   } catch(e){
     err.textContent = "Couldn't save. Check your connection and try again.";
     console.error(e);
@@ -497,8 +535,12 @@ document.getElementById("btn-done").addEventListener("click", function(){
   document.getElementById("firstname-input").value = "";
   document.getElementById("lastname-input").value = "";
   document.getElementById("city-input").value = "";
+  document.getElementById("email-input").value = "";
   document.getElementById("amount-input").value = "";
   currentNumber = null;
+  currentEmail = null;
+  currentFirstName = "";
+  currentTotalRewards = 0;
   show("screen-phone");
 });
 
