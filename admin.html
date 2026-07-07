@@ -213,6 +213,96 @@
     font-size:12px;
     padding:8px 0;
   }
+  .report-section{
+    background:var(--white);
+    border-radius:14px;
+    border:1px solid var(--gray-light);
+    padding:18px 20px;
+    margin-bottom:16px;
+  }
+  .report-title{
+    font-family:'Space Grotesk', sans-serif;
+    font-size:15px;
+    font-weight:600;
+    margin:0 0 4px;
+  }
+  .report-sub{
+    font-size:12px;
+    color:var(--gray);
+    margin:0 0 14px;
+  }
+  .barber-row{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    padding:9px 0;
+    border-bottom:1px dashed var(--gray-light);
+    font-size:13px;
+  }
+  .barber-row:last-child{border-bottom:none;}
+  .barber-rank{
+    display:flex;
+    align-items:center;
+    gap:10px;
+  }
+  .rank-badge{
+    width:22px;height:22px;
+    border-radius:50%;
+    background:var(--blue-tint);
+    color:var(--blue-dark);
+    font-size:11px;
+    font-weight:700;
+    display:flex;align-items:center;justify-content:center;
+    flex-shrink:0;
+  }
+  .barber-stats{
+    display:flex;
+    gap:16px;
+    font-size:12px;
+    color:var(--gray);
+  }
+  .barber-stats b{color:var(--navy);}
+  .freq-row{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:10px;
+    padding:9px 0;
+    border-bottom:1px dashed var(--gray-light);
+    font-size:13px;
+  }
+  .freq-row:last-child{border-bottom:none;}
+  .freq-name{font-weight:500;}
+  .freq-detail{font-size:11px; color:var(--gray);}
+  .status-pill{
+    font-size:11px;
+    font-weight:600;
+    padding:4px 10px;
+    border-radius:100px;
+    white-space:nowrap;
+  }
+  .status-overdue{background:#FCEAEA; color:var(--red);}
+  .status-due{background:#FFF4E0; color:#B26A00;}
+  .status-ok{background:var(--green-tint); color:var(--green);}
+  .status-none{background:var(--gray-light); color:var(--gray);}
+  .report-tabs{
+    display:flex;
+    gap:8px;
+    margin-bottom:12px;
+  }
+  .report-tab{
+    font-size:12px;
+    font-weight:600;
+    padding:6px 12px;
+    border-radius:100px;
+    background:var(--blue-tint);
+    color:var(--blue-dark);
+    cursor:pointer;
+    border:none;
+  }
+  .report-tab.active{background:var(--blue); color:var(--white);}
+  .freq-group{display:none;}
+  .freq-group.active{display:block;}
 </style>
 </head>
 <body>
@@ -239,6 +329,23 @@
 </header>
 
 <main>
+  <div class="report-section">
+    <p class="report-title">Barber performance</p>
+    <p class="report-sub">Ranked by number of visits served</p>
+    <div id="barber-report"></div>
+  </div>
+
+  <div class="report-section">
+    <p class="report-title">Visit frequency & who's due</p>
+    <p class="report-sub">Based on each client's average time between visits</p>
+    <div class="report-tabs">
+      <button class="report-tab active" data-group="due">Due / overdue</button>
+      <button class="report-tab" data-group="ok">Not due yet</button>
+      <button class="report-tab" data-group="none">Not enough data</button>
+    </div>
+    <div id="freq-report"></div>
+  </div>
+
   <div class="toolbar">
     <input id="search-input" type="text" placeholder="Search by name or mobile number...">
     <select id="sort-select">
@@ -302,6 +409,8 @@ async function loadClients(){
     document.getElementById("stat-clients").textContent = clients.length.toLocaleString();
     document.getElementById("stat-visits").textContent = totalVisits.toLocaleString();
     document.getElementById("stat-points").textContent = totalPoints.toLocaleString();
+    renderBarberReport(clients);
+    renderFrequencyReport(clients);
     renderList();
   } catch(e){
     console.error(e);
@@ -383,6 +492,171 @@ function renderList(){
 
   container.appendChild(list);
 }
+
+function getVisitDate(v){
+  if(!v.visitedAt) return null;
+  return v.visitedAt.toDate ? v.visitedAt.toDate() : new Date(v.visitedAt);
+}
+
+function renderBarberReport(clients){
+  var barberMap = {};
+  clients.forEach(function(c){
+    c.visits.forEach(function(v){
+      var name = v.barber || "Unspecified";
+      if(!barberMap[name]) barberMap[name] = { visits: 0, clients: {} };
+      barberMap[name].visits += 1;
+      barberMap[name].clients[c.id] = true;
+    });
+  });
+
+  var barbers = Object.keys(barberMap).map(function(name){
+    return {
+      name: name,
+      visits: barberMap[name].visits,
+      clientCount: Object.keys(barberMap[name].clients).length
+    };
+  });
+  barbers.sort(function(a, b){ return b.visits - a.visits; });
+
+  var container = document.getElementById("barber-report");
+  if(barbers.length === 0){
+    container.innerHTML = "<p class='no-visits'>No visits recorded yet — check back once purchases start coming in.</p>";
+    return;
+  }
+  container.innerHTML = "";
+  barbers.forEach(function(b, i){
+    var row = document.createElement("div");
+    row.className = "barber-row";
+    row.innerHTML =
+      "<div class='barber-rank'><span class='rank-badge'>" + (i+1) + "</span><span>" + b.name + "</span></div>" +
+      "<div class='barber-stats'><span><b>" + b.visits + "</b> visits</span><span><b>" + b.clientCount + "</b> clients</span></div>";
+    container.appendChild(row);
+  });
+}
+
+// Minimum visits needed before we trust a frequency estimate
+var MIN_VISITS_FOR_FREQUENCY = 2;
+
+function computeFrequency(client){
+  if(client.visits.length < MIN_VISITS_FOR_FREQUENCY){
+    return { status: "none" };
+  }
+  // visits are stored most-recent-first
+  var sorted = client.visits.slice().reverse(); // oldest -> newest
+  var dates = sorted.map(getVisitDate).filter(Boolean);
+  if(dates.length < MIN_VISITS_FOR_FREQUENCY){
+    return { status: "none" };
+  }
+  var spanMs = dates[dates.length - 1].getTime() - dates[0].getTime();
+  var avgIntervalDays = spanMs / (dates.length - 1) / 86400000;
+  var avgWeeks = avgIntervalDays / 7;
+
+  var lastVisit = dates[dates.length - 1];
+  var nextExpected = new Date(lastVisit.getTime() + avgIntervalDays * 86400000);
+  var daysUntilDue = Math.round((nextExpected.getTime() - Date.now()) / 86400000);
+
+  var status = "ok";
+  if(daysUntilDue < 0) status = "overdue";
+  else if(daysUntilDue <= 7) status = "due";
+
+  return {
+    status: status,
+    avgWeeks: avgWeeks,
+    nextExpected: nextExpected,
+    daysUntilDue: daysUntilDue,
+    lowConfidence: dates.length === 2
+  };
+}
+
+function renderFrequencyReport(clients){
+  var groups = { due: [], ok: [], none: [] };
+
+  clients.forEach(function(c){
+    var freq = computeFrequency(c);
+    if(freq.status === "overdue" || freq.status === "due"){
+      groups.due.push({ client: c, freq: freq });
+    } else if(freq.status === "ok"){
+      groups.ok.push({ client: c, freq: freq });
+    } else {
+      groups.none.push({ client: c, freq: freq });
+    }
+  });
+
+  groups.due.sort(function(a, b){ return a.freq.daysUntilDue - b.freq.daysUntilDue; });
+  groups.ok.sort(function(a, b){ return a.freq.daysUntilDue - b.freq.daysUntilDue; });
+
+  var container = document.getElementById("freq-report");
+  container.innerHTML = "";
+
+  ["due", "ok", "none"].forEach(function(groupKey){
+    var groupDiv = document.createElement("div");
+    groupDiv.className = "freq-group" + (groupKey === "due" ? " active" : "");
+    groupDiv.id = "freq-group-" + groupKey;
+
+    var items = groups[groupKey];
+    if(items.length === 0){
+      var emptyMsg = groupKey === "none"
+        ? "Every client with data has enough visit history for an estimate."
+        : "No clients in this category right now.";
+      groupDiv.innerHTML = "<p class='no-visits'>" + emptyMsg + "</p>";
+      container.appendChild(groupDiv);
+      return;
+    }
+
+    items.forEach(function(item){
+      var c = item.client;
+      var freq = item.freq;
+      var row = document.createElement("div");
+      row.className = "freq-row";
+
+      var pillClass = "status-" + freq.status;
+      var pillText = "";
+      var detailText = "";
+
+      if(freq.status === "none"){
+        pillClass = "status-none";
+        pillText = "Need more data";
+        detailText = client_needMoreDataText(c);
+      } else {
+        var weeksLabel = freq.avgWeeks < 1
+          ? Math.round(freq.avgWeeks * 7) + "-day pattern"
+          : freq.avgWeeks.toFixed(1) + "-week pattern";
+        detailText = "Usually every " + weeksLabel + (freq.lowConfidence ? " (based on only 2 visits)" : "");
+
+        if(freq.status === "overdue"){
+          pillText = Math.abs(freq.daysUntilDue) + "d overdue";
+        } else if(freq.status === "due"){
+          pillText = freq.daysUntilDue === 0 ? "Due today" : "Due in " + freq.daysUntilDue + "d";
+        } else {
+          pillText = "Next in " + freq.daysUntilDue + "d";
+        }
+      }
+
+      row.innerHTML =
+        "<div><div class='freq-name'>" + c.firstName + " " + c.lastName + "</div>" +
+        "<div class='freq-detail'>" + detailText + "</div></div>" +
+        "<span class='status-pill " + pillClass + "'>" + pillText + "</span>";
+      groupDiv.appendChild(row);
+    });
+
+    container.appendChild(groupDiv);
+  });
+}
+
+function client_needMoreDataText(c){
+  var count = c.visits.length;
+  if(count === 0) return "No visits recorded yet";
+  return "Only " + count + " visit" + (count > 1 ? "s" : "") + " recorded — need at least " + MIN_VISITS_FOR_FREQUENCY + " to estimate a pattern";
+}
+
+document.addEventListener("click", function(e){
+  if(e.target.classList.contains("report-tab")){
+    document.querySelectorAll(".report-tab").forEach(function(t){ t.classList.remove("active"); });
+    document.querySelectorAll(".freq-group").forEach(function(g){ g.classList.remove("active"); });
+    e.target.classList.add("active");
+    document.getElementById("freq-group-" + e.target.dataset.group).classList.add("active");
+  }
+});
 
 document.getElementById("search-input").addEventListener("input", renderList);
 document.getElementById("sort-select").addEventListener("change", renderList);
