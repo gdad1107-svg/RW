@@ -63,6 +63,20 @@
   }
   window.addEventListener("DOMContentLoaded", loadBarberSuggestions);
   window.__reloadBarberSuggestions = loadBarberSuggestions;
+
+  // Load the configurable shop/branch name used in reward emails
+  window.__shopName = "PisoPoints";
+  async function loadShopName(){
+    try{
+      var snap = await getDoc(doc(firestoreDb, "settings", "general"));
+      if(snap.exists() && snap.data().shopName){
+        window.__shopName = snap.data().shopName;
+      }
+    } catch(e){
+      console.error("Couldn't load shop name:", e);
+    }
+  }
+  window.addEventListener("DOMContentLoaded", loadShopName);
 </script>
 
 <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
@@ -614,7 +628,8 @@ document.getElementById("btn-add").addEventListener("click", async function(){
         first_name: currentFirstName,
         amount: amt.toLocaleString(),
         points_earned: earned.toLocaleString(),
-        total_points: newTotal.toLocaleString()
+        total_points: newTotal.toLocaleString(),
+        shop_name: window.__shopName || "PisoPoints"
       }).catch(function(e){ console.error("Email send failed:", e); });
     }
   } catch(e){

@@ -11,7 +11,7 @@
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
   import {
-    getFirestore, collection, getDocs, query, orderBy, doc, updateDoc, addDoc, serverTimestamp
+    getFirestore, collection, getDocs, query, orderBy, doc, updateDoc, addDoc, serverTimestamp, setDoc, getDoc
   } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
 
   // Same project config as index.html
@@ -26,7 +26,7 @@
 
   const app = initializeApp(firebaseConfig);
   const firestoreDb = getFirestore(app);
-  window.__firebase = { firestoreDb, collection, getDocs, query, orderBy, doc, updateDoc, addDoc, serverTimestamp };
+  window.__firebase = { firestoreDb, collection, getDocs, query, orderBy, doc, updateDoc, addDoc, serverTimestamp, setDoc, getDoc };
 </script>
 <style>
   :root{
@@ -410,6 +410,18 @@
   <div style="background:#FFF4E0; border:1px solid #F0D6A6; border-radius:12px; padding:14px 18px; display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap;">
     <span style="font-size:13px; color:#B26A00;" id="repair-message"></span>
     <button id="btn-repair" style="width:auto; height:36px; padding:0 16px; font-size:13px; background:#B26A00; color:white; border-radius:8px; border:none; cursor:pointer;">Recalculate totals</button>
+  </div>
+</div>
+
+<div style="max-width:1000px; margin:16px auto 0; padding:0 16px;">
+  <div class="report-section" style="margin-bottom:0;">
+    <p class="report-title">Shop settings</p>
+    <p class="report-sub">This name is used in the reward confirmation emails sent to customers</p>
+    <div style="display:flex; gap:10px; flex-wrap:wrap;">
+      <input id="shop-name-input" type="text" placeholder="e.g. PisoPoints Barbershop - Marikina" style="flex:1; min-width:220px; height:44px; border-radius:10px; border:1.5px solid var(--gray-light); padding:0 14px; font-size:13px; font-family:'Inter', sans-serif;">
+      <button id="btn-save-shop-name" style="width:auto; height:44px; padding:0 18px; background:var(--blue); color:white; border-radius:10px;">Save</button>
+    </div>
+    <p class="save-status" id="shop-name-status"></p>
   </div>
 </div>
 
@@ -992,6 +1004,45 @@ document.getElementById("btn-repair").addEventListener("click", async function()
   }
 });
 
+async function loadShopSettings(){
+  var fb = window.__firebase;
+  try{
+    var snap = await fb.getDoc(fb.doc(fb.firestoreDb, "settings", "general"));
+    if(snap.exists() && snap.data().shopName){
+      document.getElementById("shop-name-input").value = snap.data().shopName;
+    }
+  } catch(e){
+    console.error("Couldn't load shop settings:", e);
+  }
+}
+
+document.getElementById("btn-save-shop-name").addEventListener("click", async function(){
+  var fb = window.__firebase;
+  var btn = this;
+  var status = document.getElementById("shop-name-status");
+  var name = document.getElementById("shop-name-input").value.trim();
+  if(!name){
+    status.textContent = "Enter a name before saving.";
+    status.className = "save-status error";
+    return;
+  }
+  btn.disabled = true;
+  btn.textContent = "Saving...";
+  try{
+    await fb.setDoc(fb.doc(fb.firestoreDb, "settings", "general"), { shopName: name }, { merge: true });
+    status.textContent = "Saved. This name will now appear in reward emails.";
+    status.className = "save-status success";
+  } catch(e){
+    console.error(e);
+    status.textContent = "Couldn't save. Check your connection and try again.";
+    status.className = "save-status error";
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Save";
+  }
+});
+
+window.addEventListener("DOMContentLoaded", loadShopSettings);
 window.addEventListener("DOMContentLoaded", loadClients);
 </script>
 
