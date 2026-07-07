@@ -18,6 +18,30 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<script type="module">
+  // ---- Firebase setup ----
+  // 1. Go to Firebase console > Project settings > Your apps > copy your config here
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
+  import {
+    getFirestore, doc, getDoc, setDoc, updateDoc, increment
+  } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyBB-d6GomYG30Yc0MzIMYU2rYz-EHtobC0",
+    authDomain: "pisopoints-rewards.firebaseapp.com",
+    projectId: "pisopoints-rewards",
+    storageBucket: "pisopoints-rewards.firebasestorage.app",
+    messagingSenderId: "338922845267",
+    appId: "1:338922845267:web:58c13796cd3fdbe8bf02a6"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const firestoreDb = getFirestore(app);
+
+  // Expose the functions this page's plain-script section needs,
+  // since this block runs as an ES module and the rest of the page doesn't.
+  window.__firebase = { firestoreDb, doc, getDoc, setDoc, updateDoc, increment };
+</script>
 <style>
   :root{
     --navy:#0B2545;
@@ -342,18 +366,20 @@
 </div>
 
 <script>
-// In-memory member records for this demo.
-// In production, replace this object with real calls to your backend/database,
-// e.g. GET /api/members/:mobileNumber and POST /api/members, POST /api/transactions.
-var db = {
-  "09171234567": { firstName: "Maria", lastName: "Santos", city: "Marikina City", totalRewards: 1250 }
-};
+// Real Firestore-backed data layer.
+// Collection: "members", document ID = mobile number, fields: firstName, lastName, city, totalRewards
 var currentNumber = null;
+var currentTotalRewards = 0;
 
 function show(id){
   ["screen-phone","screen-new","screen-purchase","screen-confirm"].forEach(function(s){
     document.getElementById(s).classList.toggle("screen-hidden", s !== id);
   });
+}
+
+function setButtonLoading(btn, loading, label){
+  btn.disabled = loading;
+  btn.textContent = loading ? "Please wait..." : label;
 }
 
 var phoneInput = document.getElementById("phone-input");
@@ -363,64 +389,108 @@ phoneInput.addEventListener("input", function(e){
   document.getElementById("phone-error").textContent = "";
 });
 
-document.getElementById("btn-phone").addEventListener("click", function(){
+document.getElementById("btn-phone").addEventListener("click", async function(){
   var val = phoneInput.value.trim();
   var err = document.getElementById("phone-error");
+  var btn = this;
   if(!/^[0-9]{11}$/.test(val)){
     err.textContent = "Enter a valid 11-digit mobile number";
     phoneInput.classList.add("error");
     return;
   }
-  currentNumber = val;
-  var record = db[val];
-  var greeting = document.getElementById("purchase-greeting");
-  var badgeRow = document.getElementById("badge-row");
-  var badge = document.getElementById("points-badge");
-  if(record){
-    greeting.textContent = "Welcome back, " + record.firstName;
-    badgeRow.style.display = "flex";
-    badge.textContent = "Current points: " + record.totalRewards.toLocaleString();
-    show("screen-purchase");
-  } else {
-    show("screen-new");
+  var fb = window.__firebase;
+  setButtonLoading(btn, true, "Continue");
+  try{
+    var memberRef = fb.doc(fb.firestoreDb, "members", val);
+    var snap = await fb.getDoc(memberRef);
+    currentNumber = val;
+    var greeting = document.getElementById("purchase-greeting");
+    var badgeRow = document.getElementById("badge-row");
+    var badge = document.getElementById("points-badge");
+    if(snap.exists()){
+      var record = snap.data();
+      currentTotalRewards = record.totalRewards || 0;
+      greeting.textContent = "Welcome back, " + record.firstName;
+      badgeRow.style.display = "flex";
+      badge.textContent = "Current points: " + currentTotalRewards.toLocaleString();
+      show("screen-purchase");
+    } else {
+      show("screen-new");
+    }
+  } catch(e){
+    err.textContent = "Couldn't reach the database. Check your connection and try again.";
+    console.error(e);
+  } finally {
+    setButtonLoading(btn, false, "Continue");
   }
 });
 
-document.getElementById("btn-register").addEventListener("click", function(){
+document.getElementById("btn-register").addEventListener("click", async function(){
   var first = document.getElementById("firstname-input").value.trim();
   var last = document.getElementById("lastname-input").value.trim();
   var city = document.getElementById("city-input").value.trim();
   var err = document.getElementById("new-error");
+  var btn = this;
   if(!first || !last || !city){
     err.textContent = "All fields are required";
     return;
   }
   err.textContent = "";
-  db[currentNumber] = { firstName: first, lastName: last, city: city, totalRewards: 0 };
-  var greeting = document.getElementById("purchase-greeting");
-  greeting.textContent = "Registration complete, " + first;
-  document.getElementById("badge-row").style.display = "none";
-  show("screen-purchase");
+  var fb = window.__firebase;
+  setButtonLoading(btn, true, "Register");
+  try{
+    var memberRef = fb.doc(fb.firestoreDb, "members", currentNumber);
+    await fb.setDoc(memberRef, {
+      firstName: first,
+      lastName: last,
+      mobileNumber: currentNumber,
+      city: city,
+      totalRewards: 0
+    });
+    currentTotalRewards = 0;
+    var greeting = document.getElementById("purchase-greeting");
+    greeting.textContent = "Registration complete, " + first;
+    document.getElementById("badge-row").style.display = "none";
+    show("screen-purchase");
+  } catch(e){
+    err.textContent = "Couldn't save. Check your connection and try again.";
+    console.error(e);
+  } finally {
+    setButtonLoading(btn, false, "Register");
+  }
 });
 
 document.getElementById("amount-input").addEventListener("input", function(){
   document.getElementById("amount-error").textContent = "";
 });
 
-document.getElementById("btn-add").addEventListener("click", function(){
+document.getElementById("btn-add").addEventListener("click", async function(){
   var amt = parseFloat(document.getElementById("amount-input").value);
   var err = document.getElementById("amount-error");
+  var btn = this;
   if(!amt || amt <= 0){
     err.textContent = "Enter a valid purchase amount";
     return;
   }
-  var record = db[currentNumber];
+  var fb = window.__firebase;
   var earned = Math.round(amt / 20);
-  record.totalRewards += earned;
-  document.getElementById("earned-text").innerHTML =
-    "You earned <b>" + earned.toLocaleString() + " points</b> from this PHP " + amt.toLocaleString() + " purchase";
-  document.getElementById("total-points").textContent = record.totalRewards.toLocaleString();
-  show("screen-confirm");
+  setButtonLoading(btn, true, "Add to rewards");
+  try{
+    var memberRef = fb.doc(fb.firestoreDb, "members", currentNumber);
+    await fb.updateDoc(memberRef, {
+      totalRewards: fb.increment(earned)
+    });
+    var newTotal = currentTotalRewards + earned;
+    document.getElementById("earned-text").innerHTML =
+      "You earned <b>" + earned.toLocaleString() + " points</b> from this PHP " + amt.toLocaleString() + " purchase";
+    document.getElementById("total-points").textContent = newTotal.toLocaleString();
+    show("screen-confirm");
+  } catch(e){
+    err.textContent = "Couldn't save. Check your connection and try again.";
+    console.error(e);
+  } finally {
+    setButtonLoading(btn, false, "Add to rewards");
+  }
 });
 
 document.getElementById("btn-done").addEventListener("click", function(){
