@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PisoPoints Admin</title>
+<link rel="icon" href="icons/icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
+  import {
+    getFirestore, collection, getDocs, query, orderBy
+  } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
+
+  // Same project config as index.html
+  const firebaseConfig = {
+    apiKey: "AIzaSyBB-d6GomYG30Yc0MzIMYU2rYz-EHtobC0",
+    authDomain: "pisopoints-rewards.firebaseapp.com",
+    projectId: "pisopoints-rewards",
+    storageBucket: "pisopoints-rewards.firebasestorage.app",
+    messagingSenderId: "338922845267",
+    appId: "1:338922845267:web:58c13796cd3fdbe8bf02a6"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const firestoreDb = getFirestore(app);
+  window.__firebase = { firestoreDb, collection, getDocs, query, orderBy };
+</script>
+<style>
+  :root{
+    --navy:#0B2545;
+    --blue:#1360D9;
+    --blue-dark:#0E4AAD;
+    --blue-tint:#EAF2FE;
+    --white:#FFFFFF;
+    --gray:#6B7280;
+    --gray-light:#E5E9F0;
+    --green:#1F9D55;
+    --green-tint:#E4F6EA;
+    --red:#D64545;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    font-family:'Inter', sans-serif;
+    background:var(--blue-tint);
+    color:var(--navy);
+    min-height:100vh;
+  }
+  header{
+    background:var(--white);
+    border-bottom:1px solid var(--gray-light);
+    padding:20px 24px;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    flex-wrap:wrap;
+    gap:12px;
+  }
+  header h1{
+    font-family:'Space Grotesk', sans-serif;
+    font-size:20px;
+    font-weight:700;
+    margin:0;
+  }
+  header p{
+    font-size:12px;
+    color:var(--gray);
+    margin:2px 0 0;
+  }
+  .stats{
+    display:flex;
+    gap:12px;
+    flex-wrap:wrap;
+  }
+  .stat-card{
+    background:var(--blue-tint);
+    border-radius:12px;
+    padding:10px 16px;
+    text-align:center;
+    min-width:100px;
+  }
+  .stat-card .num{
+    font-family:'Space Grotesk', sans-serif;
+    font-size:20px;
+    font-weight:700;
+    color:var(--blue-dark);
+  }
+  .stat-card .label{
+    font-size:11px;
+    color:var(--gray);
+  }
+  main{
+    max-width:1000px;
+    margin:0 auto;
+    padding:24px 16px 60px;
+  }
+  .toolbar{
+    display:flex;
+    gap:10px;
+    margin-bottom:16px;
+    flex-wrap:wrap;
+  }
+  #search-input{
+    flex:1;
+    min-width:220px;
+    height:44px;
+    border-radius:12px;
+    border:1.5px solid var(--gray-light);
+    padding:0 14px;
+    font-size:14px;
+    font-family:'Inter', sans-serif;
+    outline:none;
+  }
+  #search-input:focus{border-color:var(--blue);}
+  select#sort-select{
+    height:44px;
+    border-radius:12px;
+    border:1.5px solid var(--gray-light);
+    padding:0 12px;
+    font-size:14px;
+    font-family:'Inter', sans-serif;
+    background:var(--white);
+  }
+  .card-list{
+    display:flex;
+    flex-direction:column;
+    gap:10px;
+  }
+  .client-card{
+    background:var(--white);
+    border-radius:14px;
+    border:1px solid var(--gray-light);
+    overflow:hidden;
+  }
+  .client-row{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:12px;
+    padding:14px 18px;
+    cursor:pointer;
+  }
+  .client-info{
+    display:flex;
+    flex-direction:column;
+    gap:2px;
+  }
+  .client-name{
+    font-weight:600;
+    font-size:14px;
+  }
+  .client-meta{
+    font-size:12px;
+    color:var(--gray);
+  }
+  .client-metrics{
+    display:flex;
+    gap:18px;
+    align-items:center;
+    flex-shrink:0;
+  }
+  .metric{
+    text-align:right;
+  }
+  .metric .value{
+    font-weight:700;
+    font-size:14px;
+    color:var(--navy);
+  }
+  .metric .label{
+    font-size:10px;
+    color:var(--gray);
+    text-transform:uppercase;
+    letter-spacing:0.03em;
+  }
+  .chevron{
+    width:18px;height:18px;
+    color:var(--gray);
+    transition:transform .15s ease;
+    flex-shrink:0;
+  }
+  .client-card.expanded .chevron{transform:rotate(180deg);}
+  .visit-history{
+    display:none;
+    border-top:1px solid var(--gray-light);
+    padding:12px 18px 16px;
+  }
+  .client-card.expanded .visit-history{display:block;}
+  .visit-row{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    padding:8px 0;
+    border-bottom:1px dashed var(--gray-light);
+    font-size:12.5px;
+  }
+  .visit-row:last-child{border-bottom:none;}
+  .visit-date{color:var(--navy); font-weight:500;}
+  .visit-barber{color:var(--blue-dark);}
+  .visit-amount{color:var(--gray);}
+  .visit-points{color:var(--green); font-weight:600;}
+  .empty-state, .loading-state{
+    text-align:center;
+    color:var(--gray);
+    font-size:13px;
+    padding:40px 0;
+  }
+  .no-visits{
+    color:var(--gray);
+    font-size:12px;
+    padding:8px 0;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>PisoPoints Admin</h1>
+    <p>Client list, visit frequency, and barber history</p>
+  </div>
+  <div class="stats">
+    <div class="stat-card">
+      <div class="num" id="stat-clients">–</div>
+      <div class="label">Clients</div>
+    </div>
+    <div class="stat-card">
+      <div class="num" id="stat-visits">–</div>
+      <div class="label">Total visits</div>
+    </div>
+    <div class="stat-card">
+      <div class="num" id="stat-points">–</div>
+      <div class="label">Points issued</div>
+    </div>
+  </div>
+</header>
+
+<main>
+  <div class="toolbar">
+    <input id="search-input" type="text" placeholder="Search by name or mobile number...">
+    <select id="sort-select">
+      <option value="recent">Sort: most recent visit</option>
+      <option value="frequent">Sort: most visits</option>
+      <option value="name">Sort: name (A-Z)</option>
+      <option value="points">Sort: most points</option>
+    </select>
+  </div>
+  <div id="list-container">
+    <p class="loading-state">Loading clients...</p>
+  </div>
+</main>
+
+<script>
+var allClients = [];
+
+function formatDate(timestamp){
+  if(!timestamp) return "—";
+  var d = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+  return d.toLocaleDateString("en-US", { year:"numeric", month:"short", day:"numeric" }) +
+         " · " + d.toLocaleTimeString("en-US", { hour:"numeric", minute:"2-digit" });
+}
+
+async function loadClients(){
+  var fb = window.__firebase;
+  var container = document.getElementById("list-container");
+  try{
+    var memberSnap = await fb.getDocs(fb.collection(fb.firestoreDb, "members"));
+    var clients = [];
+    var totalVisits = 0;
+    var totalPoints = 0;
+
+    for(var i = 0; i < memberSnap.docs.length; i++){
+      var memberDoc = memberSnap.docs[i];
+      var data = memberDoc.data();
+      var visitsQuery = fb.query(
+        fb.collection(fb.firestoreDb, "members", memberDoc.id, "visits"),
+        fb.orderBy("visitedAt", "desc")
+      );
+      var visitsSnap = await fb.getDocs(visitsQuery);
+      var visits = visitsSnap.docs.map(function(v){ return v.data(); });
+
+      totalVisits += visits.length;
+      totalPoints += (data.totalRewards || 0);
+
+      clients.push({
+        id: memberDoc.id,
+        firstName: data.firstName || "",
+        lastName: data.lastName || "",
+        city: data.city || "",
+        email: data.email || null,
+        totalRewards: data.totalRewards || 0,
+        visitCount: visits.length,
+        lastVisit: visits.length ? visits[0].visitedAt : null,
+        visits: visits
+      });
+    }
+
+    allClients = clients;
+    document.getElementById("stat-clients").textContent = clients.length.toLocaleString();
+    document.getElementById("stat-visits").textContent = totalVisits.toLocaleString();
+    document.getElementById("stat-points").textContent = totalPoints.toLocaleString();
+    renderList();
+  } catch(e){
+    console.error(e);
+    container.innerHTML = "<p class='empty-state'>Couldn't load client data. Check your connection and Firestore rules.</p>";
+  }
+}
+
+function renderList(){
+  var container = document.getElementById("list-container");
+  var searchTerm = document.getElementById("search-input").value.trim().toLowerCase();
+  var sortMode = document.getElementById("sort-select").value;
+
+  var filtered = allClients.filter(function(c){
+    var fullName = (c.firstName + " " + c.lastName).toLowerCase();
+    return fullName.indexOf(searchTerm) !== -1 || c.id.indexOf(searchTerm) !== -1;
+  });
+
+  filtered.sort(function(a, b){
+    if(sortMode === "frequent") return b.visitCount - a.visitCount;
+    if(sortMode === "name") return (a.firstName + a.lastName).localeCompare(b.firstName + b.lastName);
+    if(sortMode === "points") return b.totalRewards - a.totalRewards;
+    // recent
+    var aTime = a.lastVisit ? (a.lastVisit.toDate ? a.lastVisit.toDate().getTime() : 0) : 0;
+    var bTime = b.lastVisit ? (b.lastVisit.toDate ? b.lastVisit.toDate().getTime() : 0) : 0;
+    return bTime - aTime;
+  });
+
+  if(filtered.length === 0){
+    container.innerHTML = "<p class='empty-state'>No clients found.</p>";
+    return;
+  }
+
+  container.innerHTML = "";
+  var list = document.createElement("div");
+  list.className = "card-list";
+
+  filtered.forEach(function(client){
+    var card = document.createElement("div");
+    card.className = "client-card";
+
+    var row = document.createElement("div");
+    row.className = "client-row";
+    row.innerHTML =
+      "<div class='client-info'>" +
+        "<div class='client-name'>" + client.firstName + " " + client.lastName + "</div>" +
+        "<div class='client-meta'>" + client.id + (client.city ? " · " + client.city : "") + "</div>" +
+      "</div>" +
+      "<div class='client-metrics'>" +
+        "<div class='metric'><div class='value'>" + client.visitCount + "</div><div class='label'>Visits</div></div>" +
+        "<div class='metric'><div class='value'>" + client.totalRewards.toLocaleString() + "</div><div class='label'>Points</div></div>" +
+        "<svg class='chevron' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2'><path d='M6 9l6 6 6-6'/></svg>" +
+      "</div>";
+
+    row.addEventListener("click", function(){
+      card.classList.toggle("expanded");
+    });
+
+    var history = document.createElement("div");
+    history.className = "visit-history";
+    if(client.visits.length === 0){
+      history.innerHTML = "<p class='no-visits'>No visits recorded yet.</p>";
+    } else {
+      client.visits.forEach(function(v){
+        var vRow = document.createElement("div");
+        vRow.className = "visit-row";
+        vRow.innerHTML =
+          "<span class='visit-date'>" + formatDate(v.visitedAt) + "</span>" +
+          "<span class='visit-barber'>" + (v.barber || "—") + "</span>" +
+          "<span class='visit-amount'>PHP " + (v.amount || 0).toLocaleString() + "</span>" +
+          "<span class='visit-points'>+" + (v.pointsEarned || 0).toLocaleString() + " pts</span>";
+        history.appendChild(vRow);
+      });
+    }
+
+    card.appendChild(row);
+    card.appendChild(history);
+    list.appendChild(card);
+  });
+
+  container.appendChild(list);
+}
+
+document.getElementById("search-input").addEventListener("input", renderList);
+document.getElementById("sort-select").addEventListener("change", renderList);
+
+window.addEventListener("DOMContentLoaded", loadClients);
+</script>
+
+</body>
+</html>
