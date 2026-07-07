@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>PisoPoints Rewards</title>
+
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#1360D9">
+
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="PisoPoints">
+<meta name="mobile-web-app-capable" content="yes">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --navy:#0B2545;
+    --blue:#1360D9;
+    --blue-dark:#0E4AAD;
+    --blue-tint:#EAF2FE;
+    --blue-tint-2:#D8E9FE;
+    --white:#FFFFFF;
+    --gray:#6B7280;
+    --gray-light:#E5E9F0;
+    --green:#1F9D55;
+    --green-tint:#E4F6EA;
+    --red:#D64545;
+    --red-tint:#FCEAEA;
+    --radius:16px;
+  }
+  *{box-sizing:border-box;}
+  html, body{
+    margin:0;
+    height:100%;
+    font-family:'Inter', sans-serif;
+    background:linear-gradient(180deg, var(--blue-tint) 0%, var(--white) 340px);
+    color:var(--navy);
+    overscroll-behavior:none;
+  }
+  body{
+    display:flex;
+    justify-content:center;
+    align-items:flex-start;
+    padding:env(safe-area-inset-top,24px) 16px 24px;
+    min-height:100vh;
+  }
+  .phone{
+    width:100%;
+    max-width:420px;
+    background:var(--white);
+    border-radius:0;
+    overflow:hidden;
+  }
+  @media (min-width:460px){
+    .phone{
+      max-width:380px;
+      border-radius:32px;
+      border:1px solid var(--gray-light);
+      box-shadow:0 20px 60px rgba(11,37,69,0.08);
+      margin-top:32px;
+    }
+  }
+  .app-header{
+    padding:6px 24px 20px;
+    text-align:center;
+  }
+  .app-header .mark{
+    width:48px;height:48px;
+    margin:0 auto 12px;
+    border-radius:14px;
+    background:var(--blue);
+    display:flex;align-items:center;justify-content:center;
+  }
+  .app-header .mark svg{width:24px;height:24px;}
+  .app-header h1{
+    font-family:'Space Grotesk', sans-serif;
+    font-size:20px;
+    font-weight:700;
+    margin:0;
+    letter-spacing:-0.02em;
+  }
+  .app-header p{
+    font-size:12px;
+    color:var(--gray);
+    margin:4px 0 0;
+  }
+  .screen{
+    padding:8px 28px 32px;
+  }
+  .icon-badge{
+    width:56px;height:56px;
+    border-radius:50%;
+    background:var(--blue-tint);
+    display:flex;align-items:center;justify-content:center;
+    margin:4px auto 18px;
+  }
+  .icon-badge.success{background:var(--green-tint);}
+  .icon-badge svg{width:26px;height:26px;}
+  .screen h2{
+    font-family:'Space Grotesk', sans-serif;
+    font-size:18px;
+    font-weight:600;
+    text-align:center;
+    margin:0 0 4px;
+    letter-spacing:-0.01em;
+  }
+  .screen .sub{
+    font-size:13px;
+    color:var(--gray);
+    text-align:center;
+    margin:0 0 20px;
+    line-height:1.5;
+  }
+  label{
+    display:block;
+    font-size:12px;
+    font-weight:600;
+    color:var(--navy);
+    margin:0 0 6px;
+  }
+  .field{margin-bottom:14px;}
+  input{
+    width:100%;
+    height:46px;
+    border-radius:12px;
+    border:1.5px solid var(--gray-light);
+    background:var(--white);
+    padding:0 14px;
+    font-size:16px;
+    font-family:'Inter', sans-serif;
+    color:var(--navy);
+    outline:none;
+    transition:border-color .15s ease;
+    -webkit-appearance:none;
+  }
+  input::placeholder{color:#B7BFCC;}
+  input:focus{border-color:var(--blue);}
+  input.error{border-color:var(--red);}
+  .currency-field{position:relative;}
+  .currency-field span{
+    position:absolute;left:14px;top:50%;transform:translateY(-50%);
+    font-size:13px;font-weight:600;color:var(--gray);
+  }
+  .currency-field input{padding-left:48px;}
+  .error-text{
+    font-size:12px;
+    color:var(--red);
+    min-height:16px;
+    margin:6px 2px 0;
+  }
+  .badge-row{
+    display:flex;justify-content:center;margin-bottom:16px;
+  }
+  .points-badge{
+    background:var(--blue-tint);
+    color:var(--blue-dark);
+    font-size:12px;
+    font-weight:600;
+    padding:6px 14px;
+    border-radius:100px;
+  }
+  button{
+    width:100%;
+    height:48px;
+    border-radius:12px;
+    border:none;
+    font-family:'Inter', sans-serif;
+    font-size:15px;
+    font-weight:600;
+    cursor:pointer;
+    transition:transform .1s ease, background .15s ease;
+  }
+  button:active{transform:scale(0.98);}
+  .btn-primary{
+    background:var(--blue);
+    color:var(--white);
+    margin-top:6px;
+  }
+  .btn-primary:hover{background:var(--blue-dark);}
+  .btn-secondary{
+    background:var(--blue-tint);
+    color:var(--blue-dark);
+  }
+  .name-row{display:flex; gap:10px;}
+  .name-row .field{flex:1;}
+  .helper-note{
+    font-size:11px;
+    color:var(--gray);
+    text-align:center;
+    margin:14px 0 0;
+    padding-top:14px;
+    border-top:1px dashed var(--gray-light);
+  }
+  .summary-card{
+    background:var(--blue-tint);
+    border-radius:16px;
+    padding:20px;
+    text-align:center;
+    margin-bottom:18px;
+  }
+  .summary-card .label{
+    font-size:12px;
+    color:var(--blue-dark);
+    font-weight:600;
+    margin:0 0 6px;
+  }
+  .summary-card .value{
+    font-family:'Space Grotesk', sans-serif;
+    font-size:32px;
+    font-weight:700;
+    color:var(--navy);
+    margin:0;
+    letter-spacing:-0.02em;
+  }
+  .earned-line{
+    font-size:13px;
+    color:var(--gray);
+    text-align:center;
+    margin:0 0 18px;
+  }
+  .earned-line b{color:var(--green);font-weight:600;}
+  .screen-hidden{display:none;}
+  .install-banner{
+    display:none;
+    align-items:center;
+    justify-content:space-between;
+    gap:12px;
+    background:var(--navy);
+    color:var(--white);
+    padding:10px 16px;
+    border-radius:12px;
+    margin:0 28px 12px;
+    font-size:12px;
+  }
+  .install-banner button{
+    width:auto;
+    height:32px;
+    padding:0 12px;
+    font-size:12px;
+    background:var(--blue);
+    color:var(--white);
+  }
+</style>
+</head>
+<body>
+
+<div class="phone">
+  <div class="app-header">
+    <div class="mark">
+      <svg viewBox="0 0 24 24" fill="none"><path d="M12 2L4 6v6c0 5 3.4 8.7 8 10 4.6-1.3 8-5 8-10V6l-8-4z" stroke="white" stroke-width="1.8" stroke-linejoin="round"/><path d="M9 12l2 2 4-4" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </div>
+    <h1>PisoPoints</h1>
+    <p>Earn points on every purchase</p>
+  </div>
+
+  <div class="install-banner" id="install-banner">
+    <span>Install PisoPoints for one-tap access</span>
+    <button id="btn-install">Install</button>
+  </div>
+
+  <!-- Screen 1: Mobile number -->
+  <div class="screen" id="screen-phone">
+    <div class="icon-badge">
+      <svg viewBox="0 0 24 24" fill="none"><rect x="7" y="2" width="10" height="20" rx="2" stroke="#1360D9" stroke-width="1.8"/><path d="M10 18h4" stroke="#1360D9" stroke-width="1.8" stroke-linecap="round"/></svg>
+    </div>
+    <h2>Enter your mobile number</h2>
+    <p class="sub">We'll check if you're already a member</p>
+    <div class="field">
+      <label for="phone-input">Mobile number</label>
+      <input id="phone-input" type="tel" inputmode="numeric" maxlength="11" placeholder="09XXXXXXXXX" autocomplete="off">
+      <p class="error-text" id="phone-error"></p>
+    </div>
+    <button class="btn-primary" id="btn-phone">Continue</button>
+    <p class="helper-note">Demo tip: try 09171234567 for an existing member, or any other 11-digit number to register as new</p>
+  </div>
+
+  <!-- Screen 2: New member registration -->
+  <div class="screen screen-hidden" id="screen-new">
+    <div class="icon-badge">
+      <svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="3.5" stroke="#1360D9" stroke-width="1.8"/><path d="M5 20c1.5-3.5 4.5-5 7-5s5.5 1.5 7 5" stroke="#1360D9" stroke-width="1.8" stroke-linecap="round"/><path d="M19 8h3M20.5 6.5v3" stroke="#1360D9" stroke-width="1.8" stroke-linecap="round"/></svg>
+    </div>
+    <h2>Welcome, new member</h2>
+    <p class="sub">Tell us a bit about you to get started</p>
+    <div class="name-row">
+      <div class="field">
+        <label for="firstname-input">First name</label>
+        <input id="firstname-input" type="text" placeholder="Juan" autocomplete="off">
+      </div>
+      <div class="field">
+        <label for="lastname-input">Last name</label>
+        <input id="lastname-input" type="text" placeholder="Dela Cruz" autocomplete="off">
+      </div>
+    </div>
+    <div class="field">
+      <label for="city-input">City address</label>
+      <input id="city-input" type="text" placeholder="Marikina City" autocomplete="off">
+    </div>
+    <p class="error-text" id="new-error"></p>
+    <button class="btn-primary" id="btn-register">Register</button>
+  </div>
+
+  <!-- Screen 3: Purchase amount -->
+  <div class="screen screen-hidden" id="screen-purchase">
+    <div class="icon-badge">
+      <svg viewBox="0 0 24 24" fill="none"><path d="M6 3h12l1 4H5l1-4z" stroke="#1360D9" stroke-width="1.8" stroke-linejoin="round"/><path d="M5 7l1 13a1 1 0 001 1h10a1 1 0 001-1l1-13" stroke="#1360D9" stroke-width="1.8" stroke-linejoin="round"/><path d="M9 11h6M9 15h4" stroke="#1360D9" stroke-width="1.8" stroke-linecap="round"/></svg>
+    </div>
+    <h2 id="purchase-greeting">Enter amount purchased</h2>
+    <div class="badge-row" id="badge-row" style="display:none;">
+      <span class="points-badge" id="points-badge"></span>
+    </div>
+    <div class="field">
+      <label for="amount-input">Amount purchased</label>
+      <div class="currency-field">
+        <span>PHP</span>
+        <input id="amount-input" type="number" placeholder="0.00" min="0" step="0.01" inputmode="decimal">
+      </div>
+      <p class="error-text" id="amount-error"></p>
+    </div>
+    <button class="btn-primary" id="btn-add">Add to rewards</button>
+  </div>
+
+  <!-- Screen 4: Confirmation -->
+  <div class="screen screen-hidden" id="screen-confirm">
+    <div class="icon-badge success">
+      <svg viewBox="0 0 24 24" fill="none"><path d="M5 12.5l4.5 4.5L19 7.5" stroke="#1F9D55" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </div>
+    <h2>Points added</h2>
+    <p class="earned-line" id="earned-text"></p>
+    <div class="summary-card">
+      <p class="label">New total rewards points</p>
+      <p class="value" id="total-points">0</p>
+    </div>
+    <button class="btn-secondary" id="btn-done">Back to home</button>
+  </div>
+
+</div>
+
+<script>
+// In-memory member records for this demo.
+// In production, replace this object with real calls to your backend/database,
+// e.g. GET /api/members/:mobileNumber and POST /api/members, POST /api/transactions.
+var db = {
+  "09171234567": { firstName: "Maria", lastName: "Santos", city: "Marikina City", totalRewards: 1250 }
+};
+var currentNumber = null;
+
+function show(id){
+  ["screen-phone","screen-new","screen-purchase","screen-confirm"].forEach(function(s){
+    document.getElementById(s).classList.toggle("screen-hidden", s !== id);
+  });
+}
+
+var phoneInput = document.getElementById("phone-input");
+phoneInput.addEventListener("input", function(e){
+  e.target.value = e.target.value.replace(/[^0-9]/g, "").slice(0, 11);
+  e.target.classList.remove("error");
+  document.getElementById("phone-error").textContent = "";
+});
+
+document.getElementById("btn-phone").addEventListener("click", function(){
+  var val = phoneInput.value.trim();
+  var err = document.getElementById("phone-error");
+  if(!/^[0-9]{11}$/.test(val)){
+    err.textContent = "Enter a valid 11-digit mobile number";
+    phoneInput.classList.add("error");
+    return;
+  }
+  currentNumber = val;
+  var record = db[val];
+  var greeting = document.getElementById("purchase-greeting");
+  var badgeRow = document.getElementById("badge-row");
+  var badge = document.getElementById("points-badge");
+  if(record){
+    greeting.textContent = "Welcome back, " + record.firstName;
+    badgeRow.style.display = "flex";
+    badge.textContent = "Current points: " + record.totalRewards.toLocaleString();
+    show("screen-purchase");
+  } else {
+    show("screen-new");
+  }
+});
+
+document.getElementById("btn-register").addEventListener("click", function(){
+  var first = document.getElementById("firstname-input").value.trim();
+  var last = document.getElementById("lastname-input").value.trim();
+  var city = document.getElementById("city-input").value.trim();
+  var err = document.getElementById("new-error");
+  if(!first || !last || !city){
+    err.textContent = "All fields are required";
+    return;
+  }
+  err.textContent = "";
+  db[currentNumber] = { firstName: first, lastName: last, city: city, totalRewards: 0 };
+  var greeting = document.getElementById("purchase-greeting");
+  greeting.textContent = "Registration complete, " + first;
+  document.getElementById("badge-row").style.display = "none";
+  show("screen-purchase");
+});
+
+document.getElementById("amount-input").addEventListener("input", function(){
+  document.getElementById("amount-error").textContent = "";
+});
+
+document.getElementById("btn-add").addEventListener("click", function(){
+  var amt = parseFloat(document.getElementById("amount-input").value);
+  var err = document.getElementById("amount-error");
+  if(!amt || amt <= 0){
+    err.textContent = "Enter a valid purchase amount";
+    return;
+  }
+  var record = db[currentNumber];
+  var earned = Math.round(amt / 20);
+  record.totalRewards += earned;
+  document.getElementById("earned-text").innerHTML =
+    "You earned <b>" + earned.toLocaleString() + " points</b> from this PHP " + amt.toLocaleString() + " purchase";
+  document.getElementById("total-points").textContent = record.totalRewards.toLocaleString();
+  show("screen-confirm");
+});
+
+document.getElementById("btn-done").addEventListener("click", function(){
+  phoneInput.value = "";
+  document.getElementById("firstname-input").value = "";
+  document.getElementById("lastname-input").value = "";
+  document.getElementById("city-input").value = "";
+  document.getElementById("amount-input").value = "";
+  currentNumber = null;
+  show("screen-phone");
+});
+
+// PWA install prompt (Android/Chrome)
+var deferredPrompt = null;
+window.addEventListener("beforeinstallprompt", function(e){
+  e.preventDefault();
+  deferredPrompt = e;
+  document.getElementById("install-banner").style.display = "flex";
+});
+document.getElementById("btn-install").addEventListener("click", function(){
+  if(!deferredPrompt) return;
+  deferredPrompt.prompt();
+  deferredPrompt.userChoice.then(function(){
+    deferredPrompt = null;
+    document.getElementById("install-banner").style.display = "none";
+  });
+});
+
+// Register service worker for offline support and installability
+if("serviceWorker" in navigator){
+  window.addEventListener("load", function(){
+    navigator.serviceWorker.register("sw.js").catch(function(err){
+      console.log("Service worker registration failed", err);
+    });
+  });
+}
+</script>
+
+</body>
+</html>
