@@ -11,7 +11,7 @@
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
   import {
-    getFirestore, collection, getDocs, query, orderBy, doc, updateDoc
+    getFirestore, collection, getDocs, query, orderBy, doc, updateDoc, addDoc, serverTimestamp
   } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
 
   // Same project config as index.html
@@ -26,7 +26,7 @@
 
   const app = initializeApp(firebaseConfig);
   const firestoreDb = getFirestore(app);
-  window.__firebase = { firestoreDb, collection, getDocs, query, orderBy, doc, updateDoc };
+  window.__firebase = { firestoreDb, collection, getDocs, query, orderBy, doc, updateDoc, addDoc, serverTimestamp };
 </script>
 <style>
   :root{
@@ -303,6 +303,84 @@
   .report-tab.active{background:var(--blue); color:var(--white);}
   .freq-group{display:none;}
   .freq-group.active{display:block;}
+  .sales-row{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    padding:10px 0;
+    border-bottom:1px dashed var(--gray-light);
+    font-size:13px;
+    gap:12px;
+    flex-wrap:wrap;
+  }
+  .sales-row:last-child{border-bottom:none;}
+  .sales-row.today{background:var(--blue-tint); border-radius:10px; padding:10px 12px; border-bottom:none;}
+  .sales-date{font-weight:600; min-width:110px;}
+  .sales-breakdown{
+    display:flex;
+    gap:16px;
+    font-size:12px;
+    color:var(--gray);
+  }
+  .sales-breakdown b{color:var(--navy);}
+  .sales-total{font-weight:700; font-size:14px; color:var(--blue-dark); min-width:110px; text-align:right;}
+  .txn-row{
+    display:flex;
+    gap:8px;
+    margin-bottom:8px;
+    align-items:flex-start;
+  }
+  .txn-row input{flex:1;}
+  .txn-row .txn-amount{flex:1.2;}
+  .txn-row .txn-number{flex:1;}
+  .txn-remove{
+    width:36px; height:46px;
+    flex:none;
+    background:var(--red-tint);
+    color:var(--red);
+    border-radius:10px;
+    border:none;
+    font-size:16px;
+    cursor:pointer;
+  }
+  .txn-actions{
+    display:flex;
+    gap:10px;
+    margin-top:10px;
+  }
+  .btn-add-row{
+    background:var(--blue-tint);
+    color:var(--blue-dark);
+    flex:none;
+    width:auto;
+    padding:0 16px;
+    height:40px;
+  }
+  .btn-submit-sales{
+    height:40px;
+  }
+  .manual-date-row{
+    margin-bottom:14px;
+  }
+  .manual-date-row label{
+    display:block; font-size:12px; font-weight:600; margin-bottom:6px;
+  }
+  .manual-date-row input{
+    width:200px;
+    height:42px;
+    border-radius:10px;
+    border:1.5px solid var(--gray-light);
+    padding:0 12px;
+    font-size:13px;
+    font-family:'Inter', sans-serif;
+  }
+  .save-status{
+    font-size:12px;
+    margin-top:10px;
+    min-height:16px;
+  }
+  .save-status.success{color:var(--green);}
+  .save-status.error{color:var(--red);}
 </style>
 </head>
 <body>
@@ -336,6 +414,29 @@
 </div>
 
 <main>
+  <div class="report-section">
+    <p class="report-title">Daily sales</p>
+    <p class="report-sub">App-tracked sales combined with manually logged walk-in transactions</p>
+    <div id="sales-report">
+      <p class="loading-state">Loading sales data...</p>
+    </div>
+  </div>
+
+  <div class="report-section">
+    <p class="report-title">Log walk-in transactions</p>
+    <p class="report-sub">For customers who paid without using the app. Add as many transactions as needed, then save them all at once.</p>
+    <div class="manual-date-row">
+      <label for="manual-date-input">Date these transactions belong to</label>
+      <input id="manual-date-input" type="date">
+    </div>
+    <div id="txn-rows"></div>
+    <div class="txn-actions">
+      <button class="btn-add-row" id="btn-add-txn-row">+ Add transaction</button>
+      <button class="btn-primary btn-submit-sales" id="btn-submit-txns" style="flex:1;">Save transactions</button>
+    </div>
+    <p class="save-status" id="txn-save-status"></p>
+  </div>
+
   <div class="report-section">
     <p class="report-title">Barber performance</p>
     <p class="report-sub">Ranked by number of visits served</p>
@@ -420,6 +521,7 @@ async function loadClients(){
     renderFrequencyReport(clients);
     renderList();
     checkForMismatches(clients);
+    refreshSalesReport();
   } catch(e){
     console.error(e);
     container.innerHTML = "<p class='empty-state'>Couldn't load client data. Check your connection and Firestore rules.</p>";
@@ -501,7 +603,183 @@ function renderList(){
   container.appendChild(list);
 }
 
-function getVisitDate(v){
+function pad2(n){ return n < 10 ? "0" + n : "" + n; }
+
+function toDateKey(date){
+  return date.getFullYear() + "-" + pad2(date.getMonth() + 1) + "-" + pad2(date.getDate());
+}
+
+function formatDateKeyDisplay(dateKey){
+  var parts = dateKey.split("-");
+  var d = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+  var todayKey = toDateKey(new Date());
+  var label = d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+  return dateKey === todayKey ? label + " (today)" : label;
+}
+
+// Reuses the visit data already loaded per client — no extra Firestore reads needed
+function computeAppSalesByDate(clients){
+  var map = {};
+  clients.forEach(function(c){
+    c.visits.forEach(function(v){
+      var d = getVisitDate(v);
+      if(!d) return;
+      var key = toDateKey(d);
+      if(!map[key]) map[key] = { amount: 0, count: 0 };
+      map[key].amount += (v.amount || 0);
+      map[key].count += 1;
+    });
+  });
+  return map;
+}
+
+var manualSalesByDate = {};
+
+async function loadManualSales(){
+  var fb = window.__firebase;
+  var map = {};
+  try{
+    var snap = await fb.getDocs(fb.collection(fb.firestoreDb, "manualSales"));
+    snap.forEach(function(docSnap){
+      var data = docSnap.data();
+      var key = data.dateKey;
+      if(!key) return;
+      if(!map[key]) map[key] = { amount: 0, count: 0 };
+      map[key].amount += (data.amount || 0);
+      map[key].count += 1;
+    });
+  } catch(e){
+    console.error("Couldn't load manual sales:", e);
+  }
+  manualSalesByDate = map;
+  return map;
+}
+
+function renderSalesReport(appMap, manualMap){
+  var container = document.getElementById("sales-report");
+  var allDateKeys = {};
+  Object.keys(appMap).forEach(function(k){ allDateKeys[k] = true; });
+  Object.keys(manualMap).forEach(function(k){ allDateKeys[k] = true; });
+
+  var dateKeys = Object.keys(allDateKeys).sort().reverse();
+  if(dateKeys.length === 0){
+    container.innerHTML = "<p class='no-visits'>No sales recorded yet.</p>";
+    return;
+  }
+
+  var todayKey = toDateKey(new Date());
+  container.innerHTML = "";
+  dateKeys.forEach(function(key){
+    var app = appMap[key] || { amount: 0, count: 0 };
+    var manual = manualMap[key] || { amount: 0, count: 0 };
+    var total = app.amount + manual.amount;
+
+    var row = document.createElement("div");
+    row.className = "sales-row" + (key === todayKey ? " today" : "");
+    row.innerHTML =
+      "<span class='sales-date'>" + formatDateKeyDisplay(key) + "</span>" +
+      "<span class='sales-breakdown'>" +
+        "<span>App: <b>PHP " + app.amount.toLocaleString() + "</b> (" + app.count + ")</span>" +
+        "<span>Walk-in: <b>PHP " + manual.amount.toLocaleString() + "</b> (" + manual.count + ")</span>" +
+      "</span>" +
+      "<span class='sales-total'>PHP " + total.toLocaleString() + "</span>";
+    container.appendChild(row);
+  });
+}
+
+async function refreshSalesReport(){
+  var appMap = computeAppSalesByDate(allClients);
+  var manualMap = await loadManualSales();
+  renderSalesReport(appMap, manualMap);
+}
+
+// ---- Manual transaction entry form ----
+var txnRowCounter = 0;
+
+function addTxnRow(){
+  txnRowCounter++;
+  var id = txnRowCounter;
+  var rowsContainer = document.getElementById("txn-rows");
+  var row = document.createElement("div");
+  row.className = "txn-row";
+  row.dataset.rowId = id;
+  row.innerHTML =
+    "<input class='txn-amount' type='number' min='0' step='0.01' placeholder='Amount (PHP)' data-field='amount'>" +
+    "<input class='txn-number' type='text' placeholder='Transaction / OR number' data-field='transactionNumber'>" +
+    "<button type='button' class='txn-remove' title='Remove'>&times;</button>";
+  row.querySelector(".txn-remove").addEventListener("click", function(){
+    if(document.querySelectorAll(".txn-row").length > 1){
+      row.remove();
+    } else {
+      row.querySelectorAll("input").forEach(function(inp){ inp.value = ""; });
+    }
+  });
+  rowsContainer.appendChild(row);
+}
+
+document.getElementById("btn-add-txn-row").addEventListener("click", addTxnRow);
+
+document.getElementById("manual-date-input").value = toDateKey(new Date());
+addTxnRow();
+
+document.getElementById("btn-submit-txns").addEventListener("click", async function(){
+  var fb = window.__firebase;
+  var btn = this;
+  var status = document.getElementById("txn-save-status");
+  var dateKey = document.getElementById("manual-date-input").value || toDateKey(new Date());
+  var rows = document.querySelectorAll(".txn-row");
+
+  var entries = [];
+  var hasError = false;
+  rows.forEach(function(row){
+    var amount = parseFloat(row.querySelector(".txn-amount").value);
+    var txnNumber = row.querySelector(".txn-number").value.trim();
+    var isBlank = !row.querySelector(".txn-amount").value && !txnNumber;
+    if(isBlank) return; // skip fully empty rows silently
+    if(!amount || amount <= 0 || !txnNumber){
+      hasError = true;
+      return;
+    }
+    entries.push({ amount: amount, transactionNumber: txnNumber });
+  });
+
+  if(hasError){
+    status.textContent = "Each transaction needs both a valid amount and a transaction number.";
+    status.className = "save-status error";
+    return;
+  }
+  if(entries.length === 0){
+    status.textContent = "Add at least one transaction before saving.";
+    status.className = "save-status error";
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = "Saving...";
+  try{
+    for(var i = 0; i < entries.length; i++){
+      await fb.addDoc(fb.collection(fb.firestoreDb, "manualSales"), {
+        amount: entries[i].amount,
+        transactionNumber: entries[i].transactionNumber,
+        dateKey: dateKey,
+        enteredAt: fb.serverTimestamp()
+      });
+    }
+    status.textContent = entries.length + " transaction" + (entries.length > 1 ? "s" : "") + " saved.";
+    status.className = "save-status success";
+    document.getElementById("txn-rows").innerHTML = "";
+    txnRowCounter = 0;
+    addTxnRow();
+    await refreshSalesReport();
+  } catch(e){
+    console.error(e);
+    status.textContent = "Couldn't save. Check your connection and try again.";
+    status.className = "save-status error";
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Save transactions";
+  }
+});
   if(!v.visitedAt) return null;
   return v.visitedAt.toDate ? v.visitedAt.toDate() : new Date(v.visitedAt);
 }
