@@ -24,7 +24,7 @@
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
   import {
     getFirestore, doc, getDoc, setDoc, updateDoc, increment,
-    collection, addDoc, serverTimestamp, getDocs
+    collection, addDoc, serverTimestamp, getDocs, query, where
   } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
 
   const firebaseConfig = {
@@ -43,7 +43,7 @@
   // since this block runs as an ES module and the rest of the page doesn't.
   window.__firebase = {
     firestoreDb, doc, getDoc, setDoc, updateDoc, increment,
-    collection, addDoc, serverTimestamp, getDocs
+    collection, addDoc, serverTimestamp, getDocs, query, where
   };
 
   // Populate the barber autocomplete list from previously used names
@@ -510,8 +510,18 @@ document.getElementById("btn-register").addEventListener("click", async function
   }
   err.textContent = "";
   var fb = window.__firebase;
+  var emailLower = email ? email.toLowerCase() : null;
   setButtonLoading(btn, true, "Register");
   try{
+    if(emailLower){
+      var dupQuery = fb.query(fb.collection(fb.firestoreDb, "members"), fb.where("emailLower", "==", emailLower));
+      var dupSnap = await fb.getDocs(dupQuery);
+      if(!dupSnap.empty){
+        err.textContent = "This email already exists on another member's account";
+        setButtonLoading(btn, false, "Register");
+        return;
+      }
+    }
     var memberRef = fb.doc(fb.firestoreDb, "members", currentNumber);
     await fb.setDoc(memberRef, {
       firstName: first,
@@ -519,6 +529,7 @@ document.getElementById("btn-register").addEventListener("click", async function
       mobileNumber: currentNumber,
       city: city,
       email: email || null,
+      emailLower: emailLower,
       totalRewards: 0
     });
     currentTotalRewards = 0;
