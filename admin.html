@@ -381,6 +381,50 @@
   }
   .save-status.success{color:var(--green);}
   .save-status.error{color:var(--red);}
+  .page-tabs{
+    display:flex;
+    gap:8px;
+    margin-bottom:16px;
+  }
+  .page-tab{
+    font-size:13px;
+    font-weight:600;
+    padding:9px 18px;
+    border-radius:10px;
+    background:var(--white);
+    color:var(--gray);
+    border:1px solid var(--gray-light);
+    cursor:pointer;
+  }
+  .page-tab.active{background:var(--blue); color:var(--white); border-color:var(--blue);}
+  .page-content{display:none;}
+  .page-content.active{display:block;}
+  .period-tab{
+    font-size:12px;
+    font-weight:600;
+    padding:6px 12px;
+    border-radius:100px;
+    background:var(--blue-tint);
+    color:var(--blue-dark);
+    cursor:pointer;
+    border:none;
+  }
+  .period-tab.active{background:var(--blue); color:var(--white);}
+  .chart-bar-label{
+    font-size:11px;
+    fill:var(--gray);
+  }
+  .chart-value-label{
+    font-size:11px;
+    font-weight:600;
+    fill:var(--navy);
+  }
+  .chart-empty{
+    text-align:center;
+    color:var(--gray);
+    font-size:13px;
+    padding:30px 0;
+  }
 </style>
 </head>
 <body>
@@ -426,6 +470,12 @@
 </div>
 
 <main>
+  <div class="page-tabs">
+    <button class="page-tab active" data-page-tab="overview">Overview</button>
+    <button class="page-tab" data-page-tab="charts">Charts</button>
+  </div>
+
+  <div id="page-overview" class="page-content active">
   <div class="report-section">
     <p class="report-title">Daily sales</p>
     <p class="report-sub">App-tracked sales combined with manually logged walk-in transactions</p>
@@ -477,6 +527,35 @@
   </div>
   <div id="list-container">
     <p class="loading-state">Loading clients...</p>
+  </div>
+  </div>
+
+  <div id="page-charts" class="page-content">
+    <div class="report-section">
+      <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:4px;">
+        <div>
+          <p class="report-title" style="margin-bottom:0;">Charts</p>
+          <p class="report-sub" style="margin-bottom:0;">View sales trend and barber activity by period</p>
+        </div>
+        <div class="report-tabs" style="margin-bottom:0;">
+          <button class="period-tab active" data-period="daily">Daily</button>
+          <button class="period-tab" data-period="weekly">Weekly</button>
+          <button class="period-tab" data-period="monthly">Monthly</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="report-section">
+      <p class="report-title">Sales trend</p>
+      <p class="report-sub" id="sales-trend-sub">Total sales (app + walk-in) per day, most recent 14 days</p>
+      <div id="sales-trend-chart"></div>
+    </div>
+
+    <div class="report-section">
+      <p class="report-title">Visits per barber</p>
+      <p class="report-sub" id="barber-count-sub">Number of clients served today</p>
+      <div id="barber-count-chart"></div>
+    </div>
   </div>
 </main>
 
@@ -646,6 +725,8 @@ function computeAppSalesByDate(clients){
 }
 
 var manualSalesByDate = {};
+var lastAppSalesByDate = {};
+var currentChartPeriod = "daily";
 
 async function loadManualSales(){
   var fb = window.__firebase;
@@ -701,8 +782,10 @@ function renderSalesReport(appMap, manualMap){
 
 async function refreshSalesReport(){
   var appMap = computeAppSalesByDate(allClients);
+  lastAppSalesByDate = appMap;
   var manualMap = await loadManualSales();
   renderSalesReport(appMap, manualMap);
+  renderCharts();
 }
 
 // ---- Manual transaction entry form ----
@@ -956,6 +1039,176 @@ document.addEventListener("click", function(e){
     e.target.classList.add("active");
     document.getElementById("freq-group-" + e.target.dataset.group).classList.add("active");
   }
+});
+
+// ---- Charts tab ----
+
+function startOfDay(d){ var r = new Date(d); r.setHours(0,0,0,0); return r; }
+function endOfDay(d){ var r = new Date(d); r.setHours(23,59,59,999); return r; }
+function parseDateKey(key){
+  var p = key.split("-");
+  return new Date(parseInt(p[0]), parseInt(p[1]) - 1, parseInt(p[2]));
+}
+function getWeekStart(date){
+  var d = new Date(date);
+  var day = d.getDay(); // 0 = Sunday
+  var diff = (day === 0) ? 6 : day - 1; // Monday-start week
+  d.setDate(d.getDate() - diff);
+  d.setHours(0,0,0,0);
+  return d;
+}
+
+function escapeHtml(s){
+  return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+function buildSalesBuckets(dailyTotals, period){
+  var today = new Date();
+  var buckets = [];
+
+  if(period === "daily"){
+    for(var i = 13; i >= 0; i--){
+      var d = new Date(today); d.setDate(d.getDate() - i);
+      var key = toDateKey(d);
+      buckets.push({ label: d.toLocaleDateString("en-US", { month: "short", day: "numeric" }), value: dailyTotals[key] || 0 });
+    }
+  } else if(period === "weekly"){
+    var thisWeekStart = getWeekStart(today);
+    for(var w = 11; w >= 0; w--){
+      var weekStart = new Date(thisWeekStart); weekStart.setDate(weekStart.getDate() - (w * 7));
+      var sum = 0;
+      for(var d2 = 0; d2 < 7; d2++){
+        var day = new Date(weekStart); day.setDate(day.getDate() + d2);
+        sum += dailyTotals[toDateKey(day)] || 0;
+      }
+      buckets.push({ label: weekStart.toLocaleDateString("en-US", { month: "short", day: "numeric" }), value: sum });
+    }
+  } else { // monthly
+    for(var m = 11; m >= 0; m--){
+      var monthDate = new Date(today.getFullYear(), today.getMonth() - m, 1);
+      var y = monthDate.getFullYear(), mo = monthDate.getMonth();
+      var sum2 = 0;
+      Object.keys(dailyTotals).forEach(function(key){
+        var kd = parseDateKey(key);
+        if(kd.getFullYear() === y && kd.getMonth() === mo) sum2 += dailyTotals[key];
+      });
+      buckets.push({ label: monthDate.toLocaleDateString("en-US", { month: "short", year: "numeric" }), value: sum2 });
+    }
+  }
+  return buckets;
+}
+
+function computeBarberCountsForPeriod(clients, period){
+  var now = new Date();
+  var rangeStart, rangeEnd;
+  if(period === "daily"){
+    rangeStart = startOfDay(now);
+    rangeEnd = endOfDay(now);
+  } else if(period === "weekly"){
+    rangeStart = getWeekStart(now);
+    rangeEnd = endOfDay(new Date(rangeStart.getTime() + 6 * 86400000));
+  } else {
+    rangeStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    rangeEnd = endOfDay(new Date(now.getFullYear(), now.getMonth() + 1, 0));
+  }
+
+  var counts = {};
+  clients.forEach(function(c){
+    c.visits.forEach(function(v){
+      var d = getVisitDate(v);
+      if(!d || d < rangeStart || d > rangeEnd) return;
+      var name = v.barber || "Unspecified";
+      counts[name] = (counts[name] || 0) + 1;
+    });
+  });
+
+  return Object.keys(counts)
+    .map(function(name){ return { label: name, value: counts[name] }; })
+    .sort(function(a, b){ return b.value - a.value; });
+}
+
+function renderBarChart(containerId, data, opts){
+  opts = opts || {};
+  var container = document.getElementById(containerId);
+  if(!data.length || data.every(function(d){ return d.value === 0; })){
+    container.innerHTML = "<p class='chart-empty'>" + (opts.emptyText || "No data yet for this period.") + "</p>";
+    return;
+  }
+
+  var maxVal = Math.max.apply(null, data.map(function(d){ return d.value; })) || 1;
+  var barCount = data.length;
+  var chartWidth = Math.max(340, barCount * 56);
+  var chartHeight = 220;
+  var barAreaHeight = 150;
+  var gap = (chartWidth - 40) / barCount;
+  var barWidth = Math.min(36, gap - 14);
+
+  var svg = "<svg viewBox='0 0 " + chartWidth + " " + chartHeight + "' width='100%' style='overflow:visible;'>";
+  data.forEach(function(d, i){
+    var barH = Math.max(2, Math.round((d.value / maxVal) * barAreaHeight));
+    var x = 20 + i * gap + (gap - barWidth) / 2;
+    var y = 20 + (barAreaHeight - barH);
+    var color = opts.color || "#1360D9";
+    var valLabel = opts.valueFormatter ? opts.valueFormatter(d.value) : d.value;
+    svg += "<rect x='" + x + "' y='" + y + "' width='" + barWidth + "' height='" + barH + "' rx='6' fill='" + color + "'></rect>";
+    svg += "<text x='" + (x + barWidth/2) + "' y='" + (y - 6) + "' text-anchor='middle' class='chart-value-label'>" + escapeHtml(valLabel) + "</text>";
+    svg += "<text x='" + (x + barWidth/2) + "' y='" + (barAreaHeight + 38) + "' text-anchor='middle' class='chart-bar-label'>" + escapeHtml(d.label) + "</text>";
+  });
+  svg += "</svg>";
+  container.innerHTML = "<div style='overflow-x:auto;'>" + svg + "</div>";
+}
+
+function renderCharts(){
+  var dailyTotals = {};
+  Object.keys(lastAppSalesByDate).forEach(function(k){
+    dailyTotals[k] = (dailyTotals[k] || 0) + lastAppSalesByDate[k].amount;
+  });
+  Object.keys(manualSalesByDate).forEach(function(k){
+    dailyTotals[k] = (dailyTotals[k] || 0) + manualSalesByDate[k].amount;
+  });
+
+  var buckets = buildSalesBuckets(dailyTotals, currentChartPeriod);
+  var salesSubText = currentChartPeriod === "daily"
+    ? "Total sales (app + walk-in) per day, most recent 14 days"
+    : currentChartPeriod === "weekly"
+    ? "Total sales (app + walk-in) per week, most recent 12 weeks"
+    : "Total sales (app + walk-in) per month, most recent 12 months";
+  document.getElementById("sales-trend-sub").textContent = salesSubText;
+  renderBarChart("sales-trend-chart", buckets, {
+    color: "#1360D9",
+    valueFormatter: function(v){ return "PHP " + Math.round(v).toLocaleString(); }
+  });
+
+  var barberCounts = computeBarberCountsForPeriod(allClients, currentChartPeriod);
+  var barberSubText = currentChartPeriod === "daily"
+    ? "Number of clients served today"
+    : currentChartPeriod === "weekly"
+    ? "Number of clients served this week"
+    : "Number of clients served this month";
+  document.getElementById("barber-count-sub").textContent = barberSubText;
+  renderBarChart("barber-count-chart", barberCounts, {
+    color: "#0E4AAD",
+    valueFormatter: function(v){ return String(v); },
+    emptyText: "No visits recorded for this period yet."
+  });
+}
+
+document.querySelectorAll(".period-tab").forEach(function(tab){
+  tab.addEventListener("click", function(){
+    document.querySelectorAll(".period-tab").forEach(function(t){ t.classList.remove("active"); });
+    this.classList.add("active");
+    currentChartPeriod = this.dataset.period;
+    renderCharts();
+  });
+});
+
+document.querySelectorAll(".page-tab").forEach(function(tab){
+  tab.addEventListener("click", function(){
+    document.querySelectorAll(".page-tab").forEach(function(t){ t.classList.remove("active"); });
+    document.querySelectorAll(".page-content").forEach(function(c){ c.classList.remove("active"); });
+    this.classList.add("active");
+    document.getElementById("page-" + this.dataset.pageTab).classList.add("active");
+  });
 });
 
 document.getElementById("search-input").addEventListener("input", renderList);
