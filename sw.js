@@ -1,9 +1,10 @@
-var CACHE_NAME = "pablings-pogi-points-v1";
+var CACHE_NAME = "pablings-pogi-points-v2";
 var FILES_TO_CACHE = [
   "./index.html",
   "./manifest.json",
   "./icons/icon-192.png",
-  "./icons/icon-512.png"
+  "./icons/icon-512.png",
+  "./assets/pablings-logo.png"
 ];
 
 self.addEventListener("install", function(event){
