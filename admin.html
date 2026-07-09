@@ -13,6 +13,9 @@
   import {
     getFirestore, collection, getDocs, query, orderBy, doc, updateDoc, addDoc, serverTimestamp, setDoc, getDoc
   } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
+  import {
+    getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut
+  } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
 
   // Same project config as index.html
   const firebaseConfig = {
@@ -26,7 +29,30 @@
 
   const app = initializeApp(firebaseConfig);
   const firestoreDb = getFirestore(app);
+  const auth = getAuth(app);
   window.__firebase = { firestoreDb, collection, getDocs, query, orderBy, doc, updateDoc, addDoc, serverTimestamp, setDoc, getDoc };
+  window.__auth = { auth, signInWithEmailAndPassword, signOut };
+
+  // Auth gate: only signed-in users who appear in the "admins" collection
+  // can see the dashboard. Everyone else gets a sign-in form or an
+  // "unauthorized" message.
+  onAuthStateChanged(auth, async function(user){
+    if(!user){
+      if(window.__onAdminAuth) window.__onAdminAuth("signedout");
+      return;
+    }
+    try{
+      var adminSnap = await getDoc(doc(firestoreDb, "admins", user.uid));
+      if(adminSnap.exists()){
+        if(window.__onAdminAuth) window.__onAdminAuth("admin");
+      } else {
+        if(window.__onAdminAuth) window.__onAdminAuth("unauthorized");
+      }
+    } catch(e){
+      console.error("Couldn't verify admin access:", e);
+      if(window.__onAdminAuth) window.__onAdminAuth("unauthorized");
+    }
+  });
 </script>
 <style>
   :root{
@@ -49,6 +75,7 @@
     color:var(--navy);
     min-height:100vh;
   }
+  body.locked .app-only{display:none;}
   header{
     background:var(--white);
     border-bottom:1px solid var(--gray-light);
@@ -74,6 +101,7 @@
     display:flex;
     gap:12px;
     flex-wrap:wrap;
+    align-items:center;
   }
   .stat-card{
     background:var(--blue-tint);
@@ -91,6 +119,47 @@
   .stat-card .label{
     font-size:11px;
     color:var(--gray);
+  }
+  .btn-signout{
+    height:36px;
+    padding:0 14px;
+    font-size:12px;
+    font-weight:600;
+    font-family:'Inter', sans-serif;
+    background:var(--white);
+    color:var(--gray);
+    border:1px solid var(--gray-light);
+    border-radius:8px;
+    cursor:pointer;
+  }
+  .auth-gate{
+    max-width:400px;
+    margin:70px auto 0;
+    padding:0 16px;
+  }
+  .auth-gate input{
+    width:100%;
+    height:46px;
+    border-radius:10px;
+    border:1.5px solid var(--gray-light);
+    padding:0 14px;
+    font-size:14px;
+    font-family:'Inter', sans-serif;
+    margin-bottom:10px;
+    outline:none;
+  }
+  .auth-gate input:focus{border-color:var(--blue);}
+  .auth-gate button{
+    width:100%;
+    height:46px;
+    border-radius:10px;
+    border:none;
+    background:var(--blue);
+    color:var(--white);
+    font-size:14px;
+    font-weight:600;
+    font-family:'Inter', sans-serif;
+    cursor:pointer;
   }
   main{
     max-width:1000px;
@@ -427,9 +496,26 @@
   }
 </style>
 </head>
-<body>
+<body class="locked">
 
-<header>
+<!-- Sign-in gate: shown until an admin signs in -->
+<div class="auth-gate" id="auth-gate">
+  <div class="report-section" id="login-card">
+    <p class="report-title">Admin sign in</p>
+    <p class="report-sub">Sign in with your admin account to view the dashboard</p>
+    <input id="admin-email" type="email" placeholder="Email" autocomplete="username">
+    <input id="admin-password" type="password" placeholder="Password" autocomplete="current-password">
+    <button id="btn-admin-login">Sign in</button>
+    <p class="save-status" id="admin-login-status"></p>
+  </div>
+  <div class="report-section" id="unauth-card" style="display:none;">
+    <p class="report-title">Not authorized</p>
+    <p class="report-sub">This account is signed in but doesn't have admin access. Ask the owner to add your account to the admins list, or sign in with a different account.</p>
+    <button id="btn-unauth-signout">Sign out</button>
+  </div>
+</div>
+
+<header class="app-only">
   <div>
     <h1>PisoPoints Admin</h1>
     <p>Client list, visit frequency, and barber history</p>
@@ -447,17 +533,18 @@
       <div class="num" id="stat-points">–</div>
       <div class="label">Points issued</div>
     </div>
+    <button class="btn-signout" id="btn-signout">Sign out</button>
   </div>
 </header>
 
-<div id="repair-banner" style="display:none; max-width:1000px; margin:16px auto 0; padding:0 16px;">
+<div id="repair-banner" class="app-only" style="display:none; max-width:1000px; margin:16px auto 0; padding:0 16px;">
   <div style="background:#FFF4E0; border:1px solid #F0D6A6; border-radius:12px; padding:14px 18px; display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap;">
     <span style="font-size:13px; color:#B26A00;" id="repair-message"></span>
     <button id="btn-repair" style="width:auto; height:36px; padding:0 16px; font-size:13px; background:#B26A00; color:white; border-radius:8px; border:none; cursor:pointer;">Recalculate totals</button>
   </div>
 </div>
 
-<div style="max-width:1000px; margin:16px auto 0; padding:0 16px;">
+<div class="app-only" style="max-width:1000px; margin:16px auto 0; padding:0 16px;">
   <div class="report-section" style="margin-bottom:0;">
     <p class="report-title">Shop settings</p>
     <p class="report-sub">This name is used in the reward confirmation emails sent to customers</p>
@@ -469,7 +556,7 @@
   </div>
 </div>
 
-<main>
+<main class="app-only">
   <div class="page-tabs">
     <button class="page-tab active" data-page-tab="overview">Overview</button>
     <button class="page-tab" data-page-tab="charts">Charts</button>
@@ -561,6 +648,71 @@
 
 <script>
 var allClients = [];
+
+// ---- Auth gate ----
+var dashboardStarted = false;
+
+window.__onAdminAuth = function(state){
+  var gate = document.getElementById("auth-gate");
+  var loginCard = document.getElementById("login-card");
+  var unauthCard = document.getElementById("unauth-card");
+
+  if(state === "admin"){
+    document.body.classList.remove("locked");
+    gate.style.display = "none";
+    if(!dashboardStarted){
+      dashboardStarted = true;
+      loadShopSettings();
+      loadClients();
+    }
+    return;
+  }
+
+  document.body.classList.add("locked");
+  gate.style.display = "block";
+  loginCard.style.display = state === "signedout" ? "block" : "none";
+  unauthCard.style.display = state === "unauthorized" ? "block" : "none";
+  dashboardStarted = false;
+};
+
+document.getElementById("btn-admin-login").addEventListener("click", async function(){
+  var email = document.getElementById("admin-email").value.trim();
+  var password = document.getElementById("admin-password").value;
+  var status = document.getElementById("admin-login-status");
+  var btn = this;
+  if(!email || !password){
+    status.textContent = "Enter your email and password.";
+    status.className = "save-status error";
+    return;
+  }
+  status.textContent = "";
+  btn.disabled = true;
+  btn.textContent = "Signing in...";
+  try{
+    await window.__auth.signInWithEmailAndPassword(window.__auth.auth, email, password);
+    document.getElementById("admin-password").value = "";
+    // The auth listener unlocks the dashboard automatically.
+  } catch(e){
+    console.error(e);
+    status.textContent = "Sign-in failed. Check the email and password.";
+    status.className = "save-status error";
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Sign in";
+  }
+});
+
+document.getElementById("admin-password").addEventListener("keydown", function(e){
+  if(e.key === "Enter") document.getElementById("btn-admin-login").click();
+});
+
+document.getElementById("btn-signout").addEventListener("click", function(){
+  window.__auth.signOut(window.__auth.auth);
+});
+
+document.getElementById("btn-unauth-signout").addEventListener("click", function(){
+  window.__auth.signOut(window.__auth.auth);
+});
 
 function formatDate(timestamp){
   if(!timestamp) return "—";
@@ -1294,9 +1446,6 @@ document.getElementById("btn-save-shop-name").addEventListener("click", async fu
     btn.textContent = "Save";
   }
 });
-
-window.addEventListener("DOMContentLoaded", loadShopSettings);
-window.addEventListener("DOMContentLoaded", loadClients);
 </script>
 
 </body>

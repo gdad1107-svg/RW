@@ -26,6 +26,9 @@
     getFirestore, doc, getDoc, setDoc, updateDoc, increment,
     collection, addDoc, serverTimestamp, getDocs, query, where, writeBatch
   } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
+  import {
+    getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut
+  } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
 
   const firebaseConfig = {
     apiKey: "AIzaSyBB-d6GomYG30Yc0MzIMYU2rYz-EHtobC0",
@@ -38,6 +41,7 @@
 
   const app = initializeApp(firebaseConfig);
   const firestoreDb = getFirestore(app);
+  const auth = getAuth(app);
 
   // Expose the functions this page's plain-script section needs,
   // since this block runs as an ES module and the rest of the page doesn't.
@@ -45,6 +49,7 @@
     firestoreDb, doc, getDoc, setDoc, updateDoc, increment,
     collection, addDoc, serverTimestamp, getDocs, query, where, writeBatch
   };
+  window.__auth = { auth, signInWithEmailAndPassword, signOut };
 
   // Populate the barber autocomplete list from previously used names
   async function loadBarberSuggestions(){
@@ -61,7 +66,6 @@
       console.error("Couldn't load barber suggestions:", e);
     }
   }
-  window.addEventListener("DOMContentLoaded", loadBarberSuggestions);
   window.__reloadBarberSuggestions = loadBarberSuggestions;
 
   // Load the configurable shop/branch name used in reward emails
@@ -76,7 +80,15 @@
       console.error("Couldn't load shop name:", e);
     }
   }
-  window.addEventListener("DOMContentLoaded", loadShopName);
+
+  // Auth gate: the rest of the app only loads data once a staff member is signed in.
+  onAuthStateChanged(auth, function(user){
+    if(user){
+      loadBarberSuggestions();
+      loadShopName();
+    }
+    if(window.__onAuthChanged) window.__onAuthChanged(user);
+  });
 </script>
 
 <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
@@ -84,9 +96,9 @@
   // ---- EmailJS setup ----
   // 1. Sign up free at emailjs.com, connect an email service (e.g. Gmail), and create a template.
   // 2. Replace the three values below with your own Public Key, Service ID, and Template ID.
-  var EMAILJS_PUBLIC_KEY = "d4JDinfLxiIsYHmkV";
-  var EMAILJS_SERVICE_ID = "service_cpltqec";
-  var EMAILJS_TEMPLATE_ID = "template_s6jrg6n";
+  var EMAILJS_PUBLIC_KEY = "YOUR_PUBLIC_KEY";
+  var EMAILJS_SERVICE_ID = "YOUR_SERVICE_ID";
+  var EMAILJS_TEMPLATE_ID = "YOUR_TEMPLATE_ID";
   emailjs.init(EMAILJS_PUBLIC_KEY);
 </script>
 <style>
@@ -296,6 +308,11 @@
     padding-top:14px;
     border-top:1px dashed var(--border-dark);
   }
+  .helper-note a{
+    color:var(--text-muted);
+    text-decoration:underline;
+    cursor:pointer;
+  }
   .summary-card{
     background:var(--gold-tint);
     border-radius:16px;
@@ -361,8 +378,32 @@
     <button id="btn-install">Install</button>
   </div>
 
+  <!-- Screen 0a: Loading (shown while we check if someone is already signed in) -->
+  <div class="screen" id="screen-loading">
+    <p class="sub" style="margin-top:24px;">Loading...</p>
+  </div>
+
+  <!-- Screen 0b: Staff sign in -->
+  <div class="screen screen-hidden" id="screen-login">
+    <div class="icon-badge">
+      <svg viewBox="0 0 24 24" fill="none"><rect x="5" y="10" width="14" height="10" rx="2" stroke="#B7945A" stroke-width="1.8"/><path d="M8 10V7a4 4 0 018 0v3" stroke="#B7945A" stroke-width="1.8" stroke-linecap="round"/><circle cx="12" cy="15" r="1.4" fill="#B7945A"/></svg>
+    </div>
+    <h2>Staff sign in</h2>
+    <p class="sub">Sign in with your staff account to record purchases</p>
+    <div class="field">
+      <label for="login-email">Email</label>
+      <input id="login-email" type="email" placeholder="staff@email.com" autocomplete="username">
+    </div>
+    <div class="field">
+      <label for="login-password">Password</label>
+      <input id="login-password" type="password" placeholder="Password" autocomplete="current-password">
+    </div>
+    <p class="error-text" id="login-error"></p>
+    <button class="btn-primary" id="btn-login">Sign in</button>
+  </div>
+
   <!-- Screen 1: Mobile number -->
-  <div class="screen" id="screen-phone">
+  <div class="screen screen-hidden" id="screen-phone">
     <div class="icon-badge">
       <svg viewBox="0 0 24 24" fill="none"><rect x="7" y="2" width="10" height="20" rx="2" stroke="#B7945A" stroke-width="1.8"/><path d="M10 18h4" stroke="#B7945A" stroke-width="1.8" stroke-linecap="round"/></svg>
     </div>
@@ -374,6 +415,7 @@
       <p class="error-text" id="phone-error"></p>
     </div>
     <button class="btn-primary" id="btn-phone">Continue</button>
+    <p class="helper-note"><a id="link-signout">Sign out of staff account</a></p>
   </div>
 
   <!-- Screen 2: New member registration -->
@@ -456,7 +498,7 @@ var currentEmail = null;
 var currentFirstName = "";
 
 function show(id){
-  ["screen-phone","screen-new","screen-purchase","screen-confirm"].forEach(function(s){
+  ["screen-loading","screen-login","screen-phone","screen-new","screen-purchase","screen-confirm"].forEach(function(s){
     document.getElementById(s).classList.toggle("screen-hidden", s !== id);
   });
 }
@@ -465,6 +507,53 @@ function setButtonLoading(btn, loading, label){
   btn.disabled = loading;
   btn.textContent = loading ? "Please wait..." : label;
 }
+
+// ---- Auth gate ----
+// Called by the Firebase module script whenever sign-in state changes.
+window.__onAuthChanged = function(user){
+  if(!user){
+    show("screen-login");
+    return;
+  }
+  // Only jump to the phone screen if we're on the loading or login screen,
+  // so an auth refresh mid-transaction doesn't reset the flow.
+  var onLoading = !document.getElementById("screen-loading").classList.contains("screen-hidden");
+  var onLogin = !document.getElementById("screen-login").classList.contains("screen-hidden");
+  if(onLoading || onLogin) show("screen-phone");
+};
+
+document.getElementById("btn-login").addEventListener("click", async function(){
+  var email = document.getElementById("login-email").value.trim();
+  var password = document.getElementById("login-password").value;
+  var err = document.getElementById("login-error");
+  var btn = this;
+  if(!email || !password){
+    err.textContent = "Enter your email and password";
+    return;
+  }
+  err.textContent = "";
+  setButtonLoading(btn, true, "Sign in");
+  try{
+    await window.__auth.signInWithEmailAndPassword(window.__auth.auth, email, password);
+    document.getElementById("login-password").value = "";
+    // The auth listener switches to the phone screen automatically.
+  } catch(e){
+    console.error(e);
+    err.textContent = "Sign-in failed. Check the email and password.";
+  } finally {
+    setButtonLoading(btn, false, "Sign in");
+  }
+});
+
+// Allow pressing Enter in the password field to sign in
+document.getElementById("login-password").addEventListener("keydown", function(e){
+  if(e.key === "Enter") document.getElementById("btn-login").click();
+});
+
+document.getElementById("link-signout").addEventListener("click", function(e){
+  e.preventDefault();
+  window.__auth.signOut(window.__auth.auth);
+});
 
 var phoneInput = document.getElementById("phone-input");
 phoneInput.addEventListener("input", function(e){
