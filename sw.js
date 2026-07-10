@@ -1,4 +1,4 @@
-var CACHE_NAME = "pablings-pogi-points-v4";
+var CACHE_NAME = "pablings-pogi-points-v3";
 var FILES_TO_CACHE = [
   "./index.html",
   "./manifest.json",
