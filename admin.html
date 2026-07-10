@@ -11,11 +11,8 @@
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
   import {
-    getFirestore, collection, getDocs, query, orderBy, doc, updateDoc, addDoc, serverTimestamp, setDoc, getDoc
+    getFirestore, collection, getDocs, query, orderBy, doc, updateDoc, addDoc, serverTimestamp, setDoc, getDoc, deleteDoc
   } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
-  import {
-    getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut
-  } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
 
   // Same project config as index.html
   const firebaseConfig = {
@@ -29,30 +26,7 @@
 
   const app = initializeApp(firebaseConfig);
   const firestoreDb = getFirestore(app);
-  const auth = getAuth(app);
-  window.__firebase = { firestoreDb, collection, getDocs, query, orderBy, doc, updateDoc, addDoc, serverTimestamp, setDoc, getDoc };
-  window.__auth = { auth, signInWithEmailAndPassword, signOut };
-
-  // Auth gate: only signed-in users who appear in the "admins" collection
-  // can see the dashboard. Everyone else gets a sign-in form or an
-  // "unauthorized" message.
-  onAuthStateChanged(auth, async function(user){
-    if(!user){
-      if(window.__onAdminAuth) window.__onAdminAuth("signedout");
-      return;
-    }
-    try{
-      var adminSnap = await getDoc(doc(firestoreDb, "admins", user.uid));
-      if(adminSnap.exists()){
-        if(window.__onAdminAuth) window.__onAdminAuth("admin");
-      } else {
-        if(window.__onAdminAuth) window.__onAdminAuth("unauthorized");
-      }
-    } catch(e){
-      console.error("Couldn't verify admin access:", e);
-      if(window.__onAdminAuth) window.__onAdminAuth("unauthorized");
-    }
-  });
+  window.__firebase = { firestoreDb, collection, getDocs, query, orderBy, doc, updateDoc, addDoc, serverTimestamp, setDoc, getDoc, deleteDoc };
 </script>
 <style>
   :root{
@@ -75,7 +49,6 @@
     color:var(--navy);
     min-height:100vh;
   }
-  body.locked .app-only{display:none;}
   header{
     background:var(--white);
     border-bottom:1px solid var(--gray-light);
@@ -101,7 +74,6 @@
     display:flex;
     gap:12px;
     flex-wrap:wrap;
-    align-items:center;
   }
   .stat-card{
     background:var(--blue-tint);
@@ -119,47 +91,6 @@
   .stat-card .label{
     font-size:11px;
     color:var(--gray);
-  }
-  .btn-signout{
-    height:36px;
-    padding:0 14px;
-    font-size:12px;
-    font-weight:600;
-    font-family:'Inter', sans-serif;
-    background:var(--white);
-    color:var(--gray);
-    border:1px solid var(--gray-light);
-    border-radius:8px;
-    cursor:pointer;
-  }
-  .auth-gate{
-    max-width:400px;
-    margin:70px auto 0;
-    padding:0 16px;
-  }
-  .auth-gate input{
-    width:100%;
-    height:46px;
-    border-radius:10px;
-    border:1.5px solid var(--gray-light);
-    padding:0 14px;
-    font-size:14px;
-    font-family:'Inter', sans-serif;
-    margin-bottom:10px;
-    outline:none;
-  }
-  .auth-gate input:focus{border-color:var(--blue);}
-  .auth-gate button{
-    width:100%;
-    height:46px;
-    border-radius:10px;
-    border:none;
-    background:var(--blue);
-    color:var(--white);
-    font-size:14px;
-    font-weight:600;
-    font-family:'Inter', sans-serif;
-    cursor:pointer;
   }
   main{
     max-width:1000px;
@@ -494,28 +425,102 @@
     font-size:13px;
     padding:30px 0;
   }
+  .svc-admin-row{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:12px;
+    padding:9px 0;
+    border-bottom:1px dashed var(--gray-light);
+    font-size:13px;
+  }
+  .svc-admin-row:last-child{border-bottom:none;}
+  .svc-admin-name{font-weight:500;}
+  .svc-admin-right{
+    display:flex;
+    align-items:center;
+    gap:14px;
+  }
+  .svc-admin-price{font-weight:600; color:var(--blue-dark);}
+  .svc-delete{
+    width:30px; height:30px;
+    background:#FCEAEA;
+    color:var(--red);
+    border:none;
+    border-radius:8px;
+    font-size:15px;
+    cursor:pointer;
+    line-height:1;
+  }
+  .svc-add-row{
+    display:flex;
+    gap:8px;
+    margin-top:14px;
+    flex-wrap:wrap;
+  }
+  .svc-add-row input{
+    height:42px;
+    border-radius:10px;
+    border:1.5px solid var(--gray-light);
+    padding:0 12px;
+    font-size:13px;
+    font-family:'Inter', sans-serif;
+  }
+  .svc-add-row .svc-name-in{flex:2; min-width:180px;}
+  .svc-add-row .svc-price-in{flex:1; min-width:120px;}
+  .svc-add-row button{
+    width:auto;
+    height:42px;
+    padding:0 18px;
+    background:var(--blue);
+    color:var(--white);
+    border:none;
+    border-radius:10px;
+    font-size:13px;
+    font-weight:600;
+    font-family:'Inter', sans-serif;
+    cursor:pointer;
+  }
+  .svc-import-row{
+    display:flex;
+    gap:8px;
+    margin-top:12px;
+    align-items:center;
+    flex-wrap:wrap;
+  }
+  .svc-import-row input[type=file]{
+    font-size:12px;
+    font-family:'Inter', sans-serif;
+  }
+  .svc-import-row button{
+    width:auto;
+    height:36px;
+    padding:0 14px;
+    background:var(--blue-tint);
+    color:var(--blue-dark);
+    border:none;
+    border-radius:8px;
+    font-size:12px;
+    font-weight:600;
+    font-family:'Inter', sans-serif;
+    cursor:pointer;
+  }
+  .csv-hint{
+    font-size:11px;
+    color:var(--gray);
+    margin:8px 0 0;
+  }
+  .csv-hint code{
+    background:var(--blue-tint);
+    padding:1px 5px;
+    border-radius:4px;
+    font-size:11px;
+  }
 </style>
 </head>
-<body class="locked">
+<body>
 
-<!-- Sign-in gate: shown until an admin signs in -->
-<div class="auth-gate" id="auth-gate">
-  <div class="report-section" id="login-card">
-    <p class="report-title">Admin sign in</p>
-    <p class="report-sub">Sign in with your admin account to view the dashboard</p>
-    <input id="admin-email" type="email" placeholder="Email" autocomplete="username">
-    <input id="admin-password" type="password" placeholder="Password" autocomplete="current-password">
-    <button id="btn-admin-login">Sign in</button>
-    <p class="save-status" id="admin-login-status"></p>
-  </div>
-  <div class="report-section" id="unauth-card" style="display:none;">
-    <p class="report-title">Not authorized</p>
-    <p class="report-sub">This account is signed in but doesn't have admin access. Ask the owner to add your account to the admins list, or sign in with a different account.</p>
-    <button id="btn-unauth-signout">Sign out</button>
-  </div>
-</div>
-
-<header class="app-only">
+<header>
   <div>
     <h1>PisoPoints Admin</h1>
     <p>Client list, visit frequency, and barber history</p>
@@ -533,18 +538,17 @@
       <div class="num" id="stat-points">–</div>
       <div class="label">Points issued</div>
     </div>
-    <button class="btn-signout" id="btn-signout">Sign out</button>
   </div>
 </header>
 
-<div id="repair-banner" class="app-only" style="display:none; max-width:1000px; margin:16px auto 0; padding:0 16px;">
+<div id="repair-banner" style="display:none; max-width:1000px; margin:16px auto 0; padding:0 16px;">
   <div style="background:#FFF4E0; border:1px solid #F0D6A6; border-radius:12px; padding:14px 18px; display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap;">
     <span style="font-size:13px; color:#B26A00;" id="repair-message"></span>
     <button id="btn-repair" style="width:auto; height:36px; padding:0 16px; font-size:13px; background:#B26A00; color:white; border-radius:8px; border:none; cursor:pointer;">Recalculate totals</button>
   </div>
 </div>
 
-<div class="app-only" style="max-width:1000px; margin:16px auto 0; padding:0 16px;">
+<div style="max-width:1000px; margin:16px auto 0; padding:0 16px;">
   <div class="report-section" style="margin-bottom:0;">
     <p class="report-title">Shop settings</p>
     <p class="report-sub">This name is used in the reward confirmation emails sent to customers</p>
@@ -556,13 +560,32 @@
   </div>
 </div>
 
-<main class="app-only">
+<main>
   <div class="page-tabs">
     <button class="page-tab active" data-page-tab="overview">Overview</button>
     <button class="page-tab" data-page-tab="charts">Charts</button>
   </div>
 
   <div id="page-overview" class="page-content active">
+  <div class="report-section">
+    <p class="report-title">Services & prices</p>
+    <p class="report-sub">These appear as a selectable list in the customer app, so the front desk taps the services availed instead of typing an amount</p>
+    <div id="services-admin-list">
+      <p class="loading-state">Loading services...</p>
+    </div>
+    <div class="svc-add-row">
+      <input class="svc-name-in" id="svc-name-input" type="text" placeholder="Service or product name (e.g. Haircut)">
+      <input class="svc-price-in" id="svc-price-input" type="number" min="0" step="0.01" placeholder="Price (PHP)">
+      <button id="btn-add-service">Add service</button>
+    </div>
+    <div class="svc-import-row">
+      <input type="file" id="svc-csv-input" accept=".csv,text/csv,text/plain">
+      <button id="btn-import-csv">Import CSV</button>
+    </div>
+    <p class="csv-hint">CSV format: one item per line as <code>name,price</code> — e.g. <code>Haircut,150</code>. A header row like <code>name,price</code> is skipped automatically. Importing a name that already exists updates its price.</p>
+    <p class="save-status" id="svc-status"></p>
+  </div>
+
   <div class="report-section">
     <p class="report-title">Daily sales</p>
     <p class="report-sub">App-tracked sales combined with manually logged walk-in transactions</p>
@@ -590,6 +613,12 @@
     <p class="report-title">Barber performance</p>
     <p class="report-sub">Ranked by number of visits served</p>
     <div id="barber-report"></div>
+  </div>
+
+  <div class="report-section">
+    <p class="report-title">Top services & products</p>
+    <p class="report-sub">Ranked by how many times each item was availed</p>
+    <div id="service-report"></div>
   </div>
 
   <div class="report-section">
@@ -643,76 +672,17 @@
       <p class="report-sub" id="barber-count-sub">Number of clients served today</p>
       <div id="barber-count-chart"></div>
     </div>
+
+    <div class="report-section">
+      <p class="report-title">Services & products availed</p>
+      <p class="report-sub" id="service-count-sub">Times each item was availed today</p>
+      <div id="service-count-chart"></div>
+    </div>
   </div>
 </main>
 
 <script>
 var allClients = [];
-
-// ---- Auth gate ----
-var dashboardStarted = false;
-
-window.__onAdminAuth = function(state){
-  var gate = document.getElementById("auth-gate");
-  var loginCard = document.getElementById("login-card");
-  var unauthCard = document.getElementById("unauth-card");
-
-  if(state === "admin"){
-    document.body.classList.remove("locked");
-    gate.style.display = "none";
-    if(!dashboardStarted){
-      dashboardStarted = true;
-      loadShopSettings();
-      loadClients();
-    }
-    return;
-  }
-
-  document.body.classList.add("locked");
-  gate.style.display = "block";
-  loginCard.style.display = state === "signedout" ? "block" : "none";
-  unauthCard.style.display = state === "unauthorized" ? "block" : "none";
-  dashboardStarted = false;
-};
-
-document.getElementById("btn-admin-login").addEventListener("click", async function(){
-  var email = document.getElementById("admin-email").value.trim();
-  var password = document.getElementById("admin-password").value;
-  var status = document.getElementById("admin-login-status");
-  var btn = this;
-  if(!email || !password){
-    status.textContent = "Enter your email and password.";
-    status.className = "save-status error";
-    return;
-  }
-  status.textContent = "";
-  btn.disabled = true;
-  btn.textContent = "Signing in...";
-  try{
-    await window.__auth.signInWithEmailAndPassword(window.__auth.auth, email, password);
-    document.getElementById("admin-password").value = "";
-    // The auth listener unlocks the dashboard automatically.
-  } catch(e){
-    console.error(e);
-    status.textContent = "Sign-in failed. Check the email and password.";
-    status.className = "save-status error";
-  } finally {
-    btn.disabled = false;
-    btn.textContent = "Sign in";
-  }
-});
-
-document.getElementById("admin-password").addEventListener("keydown", function(e){
-  if(e.key === "Enter") document.getElementById("btn-admin-login").click();
-});
-
-document.getElementById("btn-signout").addEventListener("click", function(){
-  window.__auth.signOut(window.__auth.auth);
-});
-
-document.getElementById("btn-unauth-signout").addEventListener("click", function(){
-  window.__auth.signOut(window.__auth.auth);
-});
 
 function formatDate(timestamp){
   if(!timestamp) return "—";
@@ -761,6 +731,7 @@ async function loadClients(){
     document.getElementById("stat-visits").textContent = totalVisits.toLocaleString();
     document.getElementById("stat-points").textContent = totalPoints.toLocaleString();
     renderBarberReport(clients);
+    renderServiceReport(clients);
     renderFrequencyReport(clients);
     renderList();
     checkForMismatches(clients);
@@ -1069,6 +1040,56 @@ function renderBarberReport(clients){
   });
 }
 
+// Aggregates the services arrays saved on each visit.
+// Visits recorded before service tracking existed have no services data and are skipped.
+function aggregateServices(clients, rangeStart, rangeEnd){
+  var map = {}; // name -> { count, revenue }
+  clients.forEach(function(c){
+    c.visits.forEach(function(v){
+      if(!v.services || !v.services.length) return;
+      if(rangeStart || rangeEnd){
+        var d = getVisitDate(v);
+        if(!d || (rangeStart && d < rangeStart) || (rangeEnd && d > rangeEnd)) return;
+      }
+      v.services.forEach(function(item){
+        if(!item || !item.name) return;
+        var qty = item.qty || 1;
+        var price = item.price || 0;
+        if(!map[item.name]) map[item.name] = { count: 0, revenue: 0 };
+        map[item.name].count += qty;
+        map[item.name].revenue += price * qty;
+      });
+    });
+  });
+  return map;
+}
+
+function renderServiceReport(clients){
+  var map = aggregateServices(clients);
+  var items = Object.keys(map).map(function(name){
+    return { name: name, count: map[name].count, revenue: map[name].revenue };
+  });
+  items.sort(function(a, b){ return b.count - a.count; });
+
+  var container = document.getElementById("service-report");
+  if(items.length === 0){
+    container.innerHTML = "<p class='no-visits'>No service data yet. This fills in as new purchases are recorded with the service list. Visits saved before service tracking was added won't appear here.</p>";
+    return;
+  }
+  container.innerHTML = "";
+  items.forEach(function(item, i){
+    var row = document.createElement("div");
+    row.className = "barber-row";
+    var nameSpan = document.createElement("span");
+    nameSpan.textContent = item.name;
+    row.innerHTML =
+      "<div class='barber-rank'><span class='rank-badge'>" + (i+1) + "</span></div>" +
+      "<div class='barber-stats'><span><b>" + item.count.toLocaleString() + "</b> availed</span><span>PHP <b>" + Math.round(item.revenue).toLocaleString() + "</b> revenue</span></div>";
+    row.querySelector(".barber-rank").appendChild(nameSpan);
+    container.appendChild(row);
+  });
+}
+
 // Minimum visits needed before we trust a frequency estimate
 var MIN_VISITS_FOR_FREQUENCY = 2;
 
@@ -1310,6 +1331,29 @@ function renderBarChart(containerId, data, opts){
   container.innerHTML = "<div style='overflow-x:auto;'>" + svg + "</div>";
 }
 
+function getPeriodRange(period){
+  var now = new Date();
+  if(period === "daily"){
+    return { start: startOfDay(now), end: endOfDay(now) };
+  }
+  if(period === "weekly"){
+    var ws = getWeekStart(now);
+    return { start: ws, end: endOfDay(new Date(ws.getTime() + 6 * 86400000)) };
+  }
+  return {
+    start: new Date(now.getFullYear(), now.getMonth(), 1),
+    end: endOfDay(new Date(now.getFullYear(), now.getMonth() + 1, 0))
+  };
+}
+
+function computeServiceCountsForPeriod(clients, period){
+  var range = getPeriodRange(period);
+  var map = aggregateServices(clients, range.start, range.end);
+  return Object.keys(map)
+    .map(function(name){ return { label: name, value: map[name].count }; })
+    .sort(function(a, b){ return b.value - a.value; });
+}
+
 function renderCharts(){
   var dailyTotals = {};
   Object.keys(lastAppSalesByDate).forEach(function(k){
@@ -1342,6 +1386,19 @@ function renderCharts(){
     color: "#0E4AAD",
     valueFormatter: function(v){ return String(v); },
     emptyText: "No visits recorded for this period yet."
+  });
+
+  var serviceCounts = computeServiceCountsForPeriod(allClients, currentChartPeriod);
+  var serviceSubText = currentChartPeriod === "daily"
+    ? "Times each item was availed today"
+    : currentChartPeriod === "weekly"
+    ? "Times each item was availed this week"
+    : "Times each item was availed this month";
+  document.getElementById("service-count-sub").textContent = serviceSubText;
+  renderBarChart("service-count-chart", serviceCounts, {
+    color: "#1F9D55",
+    valueFormatter: function(v){ return String(v); },
+    emptyText: "No service data for this period yet."
   });
 }
 
@@ -1409,6 +1466,197 @@ document.getElementById("btn-repair").addEventListener("click", async function()
   }
 });
 
+// ---- Services & prices management ----
+
+// Same key normalization as the barbers collection: lowercase, spaces -> underscores,
+// and strip characters Firestore doesn't allow in document IDs
+function serviceKey(name){
+  return name.toLowerCase().trim().replace(/\s+/g, "_").replace(/[\/\\.#$\[\]]/g, "");
+}
+
+var adminServices = [];
+
+async function loadServicesAdmin(){
+  var fb = window.__firebase;
+  var container = document.getElementById("services-admin-list");
+  try{
+    var snap = await fb.getDocs(fb.collection(fb.firestoreDb, "services"));
+    var list = [];
+    snap.forEach(function(docSnap){
+      var data = docSnap.data();
+      if(data.name && typeof data.price === "number"){
+        list.push({ id: docSnap.id, name: data.name, price: data.price });
+      }
+    });
+    list.sort(function(a, b){ return a.name.localeCompare(b.name); });
+    adminServices = list;
+    renderServicesAdmin();
+  } catch(e){
+    console.error(e);
+    container.innerHTML = "<p class='no-visits'>Couldn't load services. Check your connection and Firestore rules.</p>";
+  }
+}
+
+function renderServicesAdmin(){
+  var container = document.getElementById("services-admin-list");
+  if(adminServices.length === 0){
+    container.innerHTML = "<p class='no-visits'>No services yet. Add them below or import a CSV. Until at least one service exists, the customer app keeps showing the manual amount box.</p>";
+    return;
+  }
+  container.innerHTML = "";
+  adminServices.forEach(function(svc){
+    var row = document.createElement("div");
+    row.className = "svc-admin-row";
+
+    var nameSpan = document.createElement("span");
+    nameSpan.className = "svc-admin-name";
+    nameSpan.textContent = svc.name;
+
+    var right = document.createElement("div");
+    right.className = "svc-admin-right";
+    var priceSpan = document.createElement("span");
+    priceSpan.className = "svc-admin-price";
+    priceSpan.textContent = "PHP " + svc.price.toLocaleString();
+    var delBtn = document.createElement("button");
+    delBtn.className = "svc-delete";
+    delBtn.title = "Remove " + svc.name;
+    delBtn.innerHTML = "&times;";
+    delBtn.addEventListener("click", async function(){
+      if(!confirm("Remove \"" + svc.name + "\" from the service list? Past visit records keep their data.")) return;
+      var fb = window.__firebase;
+      delBtn.disabled = true;
+      try{
+        await fb.deleteDoc(fb.doc(fb.firestoreDb, "services", svc.id));
+        await loadServicesAdmin();
+      } catch(e){
+        console.error(e);
+        delBtn.disabled = false;
+        setSvcStatus("Couldn't remove that service. Check your connection and try again.", true);
+      }
+    });
+
+    right.appendChild(priceSpan);
+    right.appendChild(delBtn);
+    row.appendChild(nameSpan);
+    row.appendChild(right);
+    container.appendChild(row);
+  });
+}
+
+function setSvcStatus(msg, isError){
+  var status = document.getElementById("svc-status");
+  status.textContent = msg;
+  status.className = "save-status " + (isError ? "error" : "success");
+}
+
+document.getElementById("btn-add-service").addEventListener("click", async function(){
+  var fb = window.__firebase;
+  var btn = this;
+  var nameInput = document.getElementById("svc-name-input");
+  var priceInput = document.getElementById("svc-price-input");
+  var name = nameInput.value.trim();
+  var price = parseFloat(priceInput.value);
+
+  if(!name){
+    setSvcStatus("Enter a service or product name.", true);
+    return;
+  }
+  if(isNaN(price) || price < 0){
+    setSvcStatus("Enter a valid price (0 or higher).", true);
+    return;
+  }
+  var key = serviceKey(name);
+  if(!key){
+    setSvcStatus("That name isn't valid. Use letters or numbers.", true);
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = "Saving...";
+  try{
+    await fb.setDoc(fb.doc(fb.firestoreDb, "services", key), { name: name, price: price }, { merge: true });
+    nameInput.value = "";
+    priceInput.value = "";
+    setSvcStatus("\"" + name + "\" saved at PHP " + price.toLocaleString() + ".", false);
+    await loadServicesAdmin();
+  } catch(e){
+    console.error(e);
+    setSvcStatus("Couldn't save. Check your connection and try again.", true);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Add service";
+  }
+});
+
+document.getElementById("btn-import-csv").addEventListener("click", function(){
+  var fileInput = document.getElementById("svc-csv-input");
+  var file = fileInput.files && fileInput.files[0];
+  if(!file){
+    setSvcStatus("Choose a CSV file first.", true);
+    return;
+  }
+  var reader = new FileReader();
+  reader.onerror = function(){
+    setSvcStatus("Couldn't read that file. Try saving it again as a plain CSV.", true);
+  };
+  reader.onload = async function(){
+    var fb = window.__firebase;
+    var btn = document.getElementById("btn-import-csv");
+    var lines = String(reader.result).split(/\r?\n/);
+    var entries = [];
+    var skipped = 0;
+
+    lines.forEach(function(line){
+      line = line.trim();
+      if(!line) return;
+      var parts = line.split(",");
+      if(parts.length < 2){ skipped++; return; }
+      // Price is the last column; everything before it is the name
+      // (so names containing commas still import correctly)
+      var price = parseFloat(parts[parts.length - 1].trim().replace(/^["']|["']$/g, ""));
+      var name = parts.slice(0, -1).join(",").trim().replace(/^["']|["']$/g, "");
+      if(!name || isNaN(price) || price < 0){ skipped++; return; }
+      var key = serviceKey(name);
+      if(!key){ skipped++; return; }
+      entries.push({ key: key, name: name, price: price });
+    });
+
+    if(entries.length === 0){
+      setSvcStatus("No valid rows found. Make sure each line looks like: Haircut,150", true);
+      return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = "Importing...";
+    var saved = 0;
+    try{
+      for(var i = 0; i < entries.length; i++){
+        await fb.setDoc(fb.doc(fb.firestoreDb, "services", entries[i].key), {
+          name: entries[i].name,
+          price: entries[i].price
+        }, { merge: true });
+        saved++;
+      }
+      var msg = saved + " item" + (saved > 1 ? "s" : "") + " imported.";
+      // A skipped header row is expected, so only mention skips beyond one
+      if(skipped > 1) msg += " " + skipped + " rows were skipped (missing name or invalid price).";
+      setSvcStatus(msg, false);
+      fileInput.value = "";
+      await loadServicesAdmin();
+    } catch(e){
+      console.error(e);
+      setSvcStatus("Import stopped after " + saved + " item" + (saved === 1 ? "" : "s") + ". Check your connection and try again — re-importing the same file is safe.", true);
+      await loadServicesAdmin();
+    } finally {
+      btn.disabled = false;
+      btn.textContent = "Import CSV";
+    }
+  };
+  reader.readAsText(file);
+});
+
+window.addEventListener("DOMContentLoaded", loadServicesAdmin);
+
 async function loadShopSettings(){
   var fb = window.__firebase;
   try{
@@ -1446,6 +1694,9 @@ document.getElementById("btn-save-shop-name").addEventListener("click", async fu
     btn.textContent = "Save";
   }
 });
+
+window.addEventListener("DOMContentLoaded", loadShopSettings);
+window.addEventListener("DOMContentLoaded", loadClients);
 </script>
 
 </body>

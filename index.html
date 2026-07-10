@@ -26,9 +26,6 @@
     getFirestore, doc, getDoc, setDoc, updateDoc, increment,
     collection, addDoc, serverTimestamp, getDocs, query, where, writeBatch
   } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
-  import {
-    getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut
-  } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
 
   const firebaseConfig = {
     apiKey: "AIzaSyBB-d6GomYG30Yc0MzIMYU2rYz-EHtobC0",
@@ -41,7 +38,6 @@
 
   const app = initializeApp(firebaseConfig);
   const firestoreDb = getFirestore(app);
-  const auth = getAuth(app);
 
   // Expose the functions this page's plain-script section needs,
   // since this block runs as an ES module and the rest of the page doesn't.
@@ -49,7 +45,6 @@
     firestoreDb, doc, getDoc, setDoc, updateDoc, increment,
     collection, addDoc, serverTimestamp, getDocs, query, where, writeBatch
   };
-  window.__auth = { auth, signInWithEmailAndPassword, signOut };
 
   // Populate the barber autocomplete list from previously used names
   async function loadBarberSuggestions(){
@@ -66,6 +61,7 @@
       console.error("Couldn't load barber suggestions:", e);
     }
   }
+  window.addEventListener("DOMContentLoaded", loadBarberSuggestions);
   window.__reloadBarberSuggestions = loadBarberSuggestions;
 
   // Load the configurable shop/branch name used in reward emails
@@ -80,15 +76,29 @@
       console.error("Couldn't load shop name:", e);
     }
   }
+  window.addEventListener("DOMContentLoaded", loadShopName);
 
-  // Auth gate: the rest of the app only loads data once a staff member is signed in.
-  onAuthStateChanged(auth, function(user){
-    if(user){
-      loadBarberSuggestions();
-      loadShopName();
+  // Load the services & prices configured in the admin page.
+  // If none are configured yet, the app falls back to manual amount entry.
+  window.__servicesCatalog = [];
+  async function loadServices(){
+    try{
+      var snap = await getDocs(collection(firestoreDb, "services"));
+      var list = [];
+      snap.forEach(function(docSnap){
+        var data = docSnap.data();
+        if(data.name && typeof data.price === "number"){
+          list.push({ id: docSnap.id, name: data.name, price: data.price });
+        }
+      });
+      list.sort(function(a, b){ return a.name.localeCompare(b.name); });
+      window.__servicesCatalog = list;
+      if(window.__renderServiceList) window.__renderServiceList();
+    } catch(e){
+      console.error("Couldn't load services:", e);
     }
-    if(window.__onAuthChanged) window.__onAuthChanged(user);
-  });
+  }
+  window.addEventListener("DOMContentLoaded", loadServices);
 </script>
 
 <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
@@ -308,11 +318,6 @@
     padding-top:14px;
     border-top:1px dashed var(--border-dark);
   }
-  .helper-note a{
-    color:var(--text-muted);
-    text-decoration:underline;
-    cursor:pointer;
-  }
   .summary-card{
     background:var(--gold-tint);
     border-radius:16px;
@@ -362,6 +367,100 @@
     background:var(--gold);
     color:var(--on-gold);
   }
+  .service-list{
+    display:flex;
+    flex-direction:column;
+    gap:8px;
+    max-height:280px;
+    overflow-y:auto;
+    padding:2px;
+  }
+  .service-item{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:10px;
+    background:var(--bg-page);
+    border:1.5px solid var(--border-dark);
+    border-radius:12px;
+    padding:11px 14px;
+    cursor:pointer;
+    transition:border-color .15s ease, background .15s ease;
+    -webkit-tap-highlight-color:transparent;
+  }
+  .service-item.selected{
+    border-color:var(--gold);
+    background:var(--gold-tint);
+  }
+  .service-item .svc-info{
+    display:flex;
+    flex-direction:column;
+    gap:2px;
+    min-width:0;
+  }
+  .service-item .svc-name{
+    font-size:14px;
+    font-weight:600;
+    color:var(--text-light);
+  }
+  .service-item .svc-price{
+    font-size:12px;
+    color:var(--text-muted);
+  }
+  .service-item.selected .svc-price{color:var(--gold);}
+  .svc-check{
+    width:22px;height:22px;
+    border-radius:50%;
+    border:1.5px solid var(--border-dark);
+    display:flex;align-items:center;justify-content:center;
+    flex-shrink:0;
+    color:transparent;
+  }
+  .service-item.selected .svc-check{
+    background:var(--gold);
+    border-color:var(--gold);
+    color:var(--on-gold);
+  }
+  .svc-qty{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    flex-shrink:0;
+  }
+  .svc-qty button{
+    width:30px;height:30px;
+    border-radius:8px;
+    background:var(--gold);
+    color:var(--on-gold);
+    font-size:16px;
+    font-weight:600;
+    padding:0;
+    line-height:1;
+  }
+  .svc-qty .qty-num{
+    font-size:14px;
+    font-weight:600;
+    min-width:18px;
+    text-align:center;
+    color:var(--text-light);
+  }
+  .total-line{
+    display:none;
+    background:var(--gold-tint);
+    border-radius:12px;
+    padding:12px 16px;
+    margin:4px 0 10px;
+    font-size:13px;
+    color:var(--text-light);
+    text-align:center;
+  }
+  .total-line b{color:var(--gold);}
+  .no-services-note{
+    font-size:12px;
+    color:var(--text-muted);
+    text-align:center;
+    padding:14px 0;
+  }
 </style>
 </head>
 <body>
@@ -378,32 +477,8 @@
     <button id="btn-install">Install</button>
   </div>
 
-  <!-- Screen 0a: Loading (shown while we check if someone is already signed in) -->
-  <div class="screen" id="screen-loading">
-    <p class="sub" style="margin-top:24px;">Loading...</p>
-  </div>
-
-  <!-- Screen 0b: Staff sign in -->
-  <div class="screen screen-hidden" id="screen-login">
-    <div class="icon-badge">
-      <svg viewBox="0 0 24 24" fill="none"><rect x="5" y="10" width="14" height="10" rx="2" stroke="#B7945A" stroke-width="1.8"/><path d="M8 10V7a4 4 0 018 0v3" stroke="#B7945A" stroke-width="1.8" stroke-linecap="round"/><circle cx="12" cy="15" r="1.4" fill="#B7945A"/></svg>
-    </div>
-    <h2>Staff sign in</h2>
-    <p class="sub">Sign in with your staff account to record purchases</p>
-    <div class="field">
-      <label for="login-email">Email</label>
-      <input id="login-email" type="email" placeholder="staff@email.com" autocomplete="username">
-    </div>
-    <div class="field">
-      <label for="login-password">Password</label>
-      <input id="login-password" type="password" placeholder="Password" autocomplete="current-password">
-    </div>
-    <p class="error-text" id="login-error"></p>
-    <button class="btn-primary" id="btn-login">Sign in</button>
-  </div>
-
   <!-- Screen 1: Mobile number -->
-  <div class="screen screen-hidden" id="screen-phone">
+  <div class="screen" id="screen-phone">
     <div class="icon-badge">
       <svg viewBox="0 0 24 24" fill="none"><rect x="7" y="2" width="10" height="20" rx="2" stroke="#B7945A" stroke-width="1.8"/><path d="M10 18h4" stroke="#B7945A" stroke-width="1.8" stroke-linecap="round"/></svg>
     </div>
@@ -415,7 +490,6 @@
       <p class="error-text" id="phone-error"></p>
     </div>
     <button class="btn-primary" id="btn-phone">Continue</button>
-    <p class="helper-note"><a id="link-signout">Sign out of staff account</a></p>
   </div>
 
   <!-- Screen 2: New member registration -->
@@ -456,7 +530,13 @@
     <div class="badge-row" id="badge-row" style="display:none;">
       <span class="points-badge" id="points-badge"></span>
     </div>
-    <div class="field">
+    <div class="field" id="services-field" style="display:none;">
+      <label>Services / products availed <span style="font-weight:400; color:var(--text-muted);">(tap to select)</span></label>
+      <div class="service-list" id="service-list"></div>
+      <p class="error-text" id="service-error"></p>
+    </div>
+    <div class="total-line" id="total-line"></div>
+    <div class="field" id="manual-amount-field">
       <label for="amount-input">Amount purchased</label>
       <div class="currency-field">
         <span>PHP</span>
@@ -498,7 +578,7 @@ var currentEmail = null;
 var currentFirstName = "";
 
 function show(id){
-  ["screen-loading","screen-login","screen-phone","screen-new","screen-purchase","screen-confirm"].forEach(function(s){
+  ["screen-phone","screen-new","screen-purchase","screen-confirm"].forEach(function(s){
     document.getElementById(s).classList.toggle("screen-hidden", s !== id);
   });
 }
@@ -507,53 +587,6 @@ function setButtonLoading(btn, loading, label){
   btn.disabled = loading;
   btn.textContent = loading ? "Please wait..." : label;
 }
-
-// ---- Auth gate ----
-// Called by the Firebase module script whenever sign-in state changes.
-window.__onAuthChanged = function(user){
-  if(!user){
-    show("screen-login");
-    return;
-  }
-  // Only jump to the phone screen if we're on the loading or login screen,
-  // so an auth refresh mid-transaction doesn't reset the flow.
-  var onLoading = !document.getElementById("screen-loading").classList.contains("screen-hidden");
-  var onLogin = !document.getElementById("screen-login").classList.contains("screen-hidden");
-  if(onLoading || onLogin) show("screen-phone");
-};
-
-document.getElementById("btn-login").addEventListener("click", async function(){
-  var email = document.getElementById("login-email").value.trim();
-  var password = document.getElementById("login-password").value;
-  var err = document.getElementById("login-error");
-  var btn = this;
-  if(!email || !password){
-    err.textContent = "Enter your email and password";
-    return;
-  }
-  err.textContent = "";
-  setButtonLoading(btn, true, "Sign in");
-  try{
-    await window.__auth.signInWithEmailAndPassword(window.__auth.auth, email, password);
-    document.getElementById("login-password").value = "";
-    // The auth listener switches to the phone screen automatically.
-  } catch(e){
-    console.error(e);
-    err.textContent = "Sign-in failed. Check the email and password.";
-  } finally {
-    setButtonLoading(btn, false, "Sign in");
-  }
-});
-
-// Allow pressing Enter in the password field to sign in
-document.getElementById("login-password").addEventListener("keydown", function(e){
-  if(e.key === "Enter") document.getElementById("btn-login").click();
-});
-
-document.getElementById("link-signout").addEventListener("click", function(e){
-  e.preventDefault();
-  window.__auth.signOut(window.__auth.auth);
-});
 
 var phoneInput = document.getElementById("phone-input");
 phoneInput.addEventListener("input", function(e){
@@ -654,6 +687,106 @@ document.getElementById("btn-register").addEventListener("click", async function
   }
 });
 
+// ---- Service selection ----
+// selectedServices maps a service id to the quantity chosen (0 = not selected)
+var selectedServices = {};
+
+function getSelectedItems(){
+  var catalog = window.__servicesCatalog || [];
+  var items = [];
+  catalog.forEach(function(svc){
+    var qty = selectedServices[svc.id] || 0;
+    if(qty > 0) items.push({ name: svc.name, price: svc.price, qty: qty });
+  });
+  return items;
+}
+
+function updateTotalLine(){
+  var totalLine = document.getElementById("total-line");
+  var items = getSelectedItems();
+  if(items.length === 0){
+    totalLine.style.display = "none";
+    return;
+  }
+  var total = items.reduce(function(s, it){ return s + it.price * it.qty; }, 0);
+  var points = Math.round(total / 20);
+  totalLine.innerHTML = "Total: <b>PHP " + total.toLocaleString() + "</b> · earns <b>" +
+    points.toLocaleString() + " point" + (points === 1 ? "" : "s") + "</b>";
+  totalLine.style.display = "block";
+}
+
+function renderServiceList(){
+  var catalog = window.__servicesCatalog || [];
+  var servicesField = document.getElementById("services-field");
+  var manualField = document.getElementById("manual-amount-field");
+  var listEl = document.getElementById("service-list");
+
+  // No services configured yet? Fall back to the original manual amount box.
+  if(catalog.length === 0){
+    servicesField.style.display = "none";
+    manualField.style.display = "block";
+    return;
+  }
+  servicesField.style.display = "block";
+  manualField.style.display = "none";
+
+  listEl.innerHTML = "";
+  catalog.forEach(function(svc){
+    var qty = selectedServices[svc.id] || 0;
+    var item = document.createElement("div");
+    item.className = "service-item" + (qty > 0 ? " selected" : "");
+
+    var info = document.createElement("div");
+    info.className = "svc-info";
+    info.innerHTML = "<span class='svc-name'></span><span class='svc-price'>PHP " + svc.price.toLocaleString() + "</span>";
+    info.querySelector(".svc-name").textContent = svc.name;
+    item.appendChild(info);
+
+    if(qty > 0){
+      var qtyBox = document.createElement("div");
+      qtyBox.className = "svc-qty";
+      var minus = document.createElement("button");
+      minus.type = "button"; minus.textContent = "−";
+      var num = document.createElement("span");
+      num.className = "qty-num"; num.textContent = qty;
+      var plus = document.createElement("button");
+      plus.type = "button"; plus.textContent = "+";
+      minus.addEventListener("click", function(e){
+        e.stopPropagation();
+        selectedServices[svc.id] = Math.max(0, (selectedServices[svc.id] || 0) - 1);
+        renderServiceList();
+      });
+      plus.addEventListener("click", function(e){
+        e.stopPropagation();
+        selectedServices[svc.id] = (selectedServices[svc.id] || 0) + 1;
+        renderServiceList();
+      });
+      qtyBox.appendChild(minus); qtyBox.appendChild(num); qtyBox.appendChild(plus);
+      item.appendChild(qtyBox);
+    } else {
+      var check = document.createElement("div");
+      check.className = "svc-check";
+      check.innerHTML = "<svg width='12' height='12' viewBox='0 0 24 24' fill='none'><path d='M5 12.5l4.5 4.5L19 7.5' stroke='currentColor' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/></svg>";
+      item.appendChild(check);
+    }
+
+    item.addEventListener("click", function(){
+      selectedServices[svc.id] = qty > 0 ? 0 : 1;
+      document.getElementById("service-error").textContent = "";
+      renderServiceList();
+    });
+
+    listEl.appendChild(item);
+  });
+  updateTotalLine();
+}
+window.__renderServiceList = renderServiceList;
+
+function resetServiceSelection(){
+  selectedServices = {};
+  renderServiceList();
+}
+
 document.getElementById("amount-input").addEventListener("input", function(){
   document.getElementById("amount-error").textContent = "";
 });
@@ -663,17 +796,34 @@ document.getElementById("barber-input").addEventListener("input", function(){
 });
 
 document.getElementById("btn-add").addEventListener("click", async function(){
-  var amt = parseFloat(document.getElementById("amount-input").value);
   var amountErr = document.getElementById("amount-error");
+  var serviceErr = document.getElementById("service-error");
   var barberInput = document.getElementById("barber-input");
   var barberErr = document.getElementById("barber-error");
   var btn = this;
   var hasError = false;
 
-  if(!amt || amt <= 0){
-    amountErr.textContent = "Enter a valid purchase amount";
-    hasError = true;
+  var catalog = window.__servicesCatalog || [];
+  var usingServices = catalog.length > 0;
+  var amt = 0;
+  var servicesPicked = null;
+
+  if(usingServices){
+    servicesPicked = getSelectedItems();
+    if(servicesPicked.length === 0){
+      serviceErr.textContent = "Select at least one service or product";
+      hasError = true;
+    } else {
+      amt = servicesPicked.reduce(function(s, it){ return s + it.price * it.qty; }, 0);
+    }
+  } else {
+    amt = parseFloat(document.getElementById("amount-input").value);
+    if(!amt || amt <= 0){
+      amountErr.textContent = "Enter a valid purchase amount";
+      hasError = true;
+    }
   }
+
   var barber = barberInput.value.trim();
   if(!barber){
     barberErr.textContent = "Enter which barber served this client";
@@ -683,7 +833,6 @@ document.getElementById("btn-add").addEventListener("click", async function(){
 
   var fb = window.__firebase;
   var earned = Math.round(amt / 20);
-  var barber = barberInput.value.trim();
   setButtonLoading(btn, true, "Add to rewards");
   try{
     var memberRef = fb.doc(fb.firestoreDb, "members", currentNumber);
@@ -696,6 +845,7 @@ document.getElementById("btn-add").addEventListener("click", async function(){
       amount: amt,
       pointsEarned: earned,
       barber: barber,
+      services: servicesPicked, // null for manual-amount entries
       visitedAt: fb.serverTimestamp()
     });
     // Both writes commit together, or neither does — prevents the total
@@ -710,8 +860,16 @@ document.getElementById("btn-add").addEventListener("click", async function(){
     if(window.__reloadBarberSuggestions) window.__reloadBarberSuggestions();
 
     var newTotal = currentTotalRewards + earned;
+    var itemsNote = "";
+    if(servicesPicked && servicesPicked.length){
+      var names = servicesPicked.map(function(it){
+        return it.qty > 1 ? it.name + " ×" + it.qty : it.name;
+      }).join(", ");
+      itemsNote = "<br><span style='font-size:12px;'>" + names.replace(/</g, "&lt;") + "</span>";
+    }
     document.getElementById("earned-text").innerHTML =
-      "You earned <b>" + earned.toLocaleString() + " points</b> from this PHP " + amt.toLocaleString() + " purchase";
+      "You earned <b>" + earned.toLocaleString() + " points</b> from this PHP " + amt.toLocaleString() + " purchase" + itemsNote;
+    resetServiceSelection();
     document.getElementById("total-points").textContent = newTotal.toLocaleString();
     show("screen-confirm");
 
@@ -741,6 +899,7 @@ document.getElementById("btn-done").addEventListener("click", function(){
   document.getElementById("email-input").value = "";
   document.getElementById("amount-input").value = "";
   document.getElementById("barber-input").value = "";
+  resetServiceSelection();
   currentNumber = null;
   currentEmail = null;
   currentFirstName = "";
