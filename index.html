@@ -81,11 +81,54 @@
     }
   }
 
+  // Load the services & prices configured in the admin page.
+  // If none are configured yet, the app falls back to manual amount entry.
+  window.__servicesCatalog = [];
+  async function loadServices(){
+    try{
+      var snap = await getDocs(collection(firestoreDb, "services"));
+      var list = [];
+      snap.forEach(function(docSnap){
+        var data = docSnap.data();
+        if(data.name && typeof data.price === "number"){
+          list.push({ id: docSnap.id, name: data.name, price: data.price });
+        }
+      });
+      list.sort(function(a, b){ return a.name.localeCompare(b.name); });
+      window.__servicesCatalog = list;
+      if(window.__renderServiceList) window.__renderServiceList();
+    } catch(e){
+      console.error("Couldn't load services:", e);
+    }
+  }
+
+  // Load the discounts configured in the admin page (e.g. Senior Citizen, PWD)
+  window.__discountsCatalog = [];
+  async function loadDiscounts(){
+    try{
+      var snap = await getDocs(collection(firestoreDb, "discounts"));
+      var list = [];
+      snap.forEach(function(docSnap){
+        var data = docSnap.data();
+        if(data.name && (data.type === "percent" || data.type === "fixed") && typeof data.value === "number"){
+          list.push({ id: docSnap.id, name: data.name, type: data.type, value: data.value });
+        }
+      });
+      list.sort(function(a, b){ return a.name.localeCompare(b.name); });
+      window.__discountsCatalog = list;
+      if(window.__renderDiscountOptions) window.__renderDiscountOptions();
+    } catch(e){
+      console.error("Couldn't load discounts:", e);
+    }
+  }
+
   // Auth gate: the rest of the app only loads data once a staff member is signed in.
   onAuthStateChanged(auth, function(user){
     if(user){
       loadBarberSuggestions();
       loadShopName();
+      loadServices();
+      loadDiscounts();
     }
     if(window.__onAuthChanged) window.__onAuthChanged(user);
   });
@@ -362,6 +405,95 @@
     background:var(--gold);
     color:var(--on-gold);
   }
+  .service-list{
+    display:flex;
+    flex-direction:column;
+    gap:8px;
+    max-height:280px;
+    overflow-y:auto;
+    padding:2px;
+  }
+  .service-item{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:10px;
+    background:var(--bg-page);
+    border:1.5px solid var(--border-dark);
+    border-radius:12px;
+    padding:11px 14px;
+    cursor:pointer;
+    transition:border-color .15s ease, background .15s ease;
+    -webkit-tap-highlight-color:transparent;
+  }
+  .service-item.selected{
+    border-color:var(--gold);
+    background:var(--gold-tint);
+  }
+  .service-item .svc-info{
+    display:flex;
+    flex-direction:column;
+    gap:2px;
+    min-width:0;
+  }
+  .service-item .svc-name{
+    font-size:14px;
+    font-weight:600;
+    color:var(--text-light);
+  }
+  .service-item .svc-price{
+    font-size:12px;
+    color:var(--text-muted);
+  }
+  .service-item.selected .svc-price{color:var(--gold);}
+  .svc-check{
+    width:22px;height:22px;
+    border-radius:50%;
+    border:1.5px solid var(--border-dark);
+    display:flex;align-items:center;justify-content:center;
+    flex-shrink:0;
+    color:transparent;
+  }
+  .service-item.selected .svc-check{
+    background:var(--gold);
+    border-color:var(--gold);
+    color:var(--on-gold);
+  }
+  .svc-qty{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    flex-shrink:0;
+  }
+  .svc-qty button{
+    width:30px;height:30px;
+    border-radius:8px;
+    background:var(--gold);
+    color:var(--on-gold);
+    font-size:16px;
+    font-weight:600;
+    padding:0;
+    line-height:1;
+  }
+  .svc-qty .qty-num{
+    font-size:14px;
+    font-weight:600;
+    min-width:18px;
+    text-align:center;
+    color:var(--text-light);
+  }
+  .total-line{
+    display:none;
+    background:var(--gold-tint);
+    border-radius:12px;
+    padding:12px 16px;
+    margin:4px 0 10px;
+    font-size:13px;
+    color:var(--text-light);
+    text-align:center;
+    line-height:1.6;
+  }
+  .total-line b{color:var(--gold);}
 </style>
 </head>
 <body>
@@ -456,7 +588,12 @@
     <div class="badge-row" id="badge-row" style="display:none;">
       <span class="points-badge" id="points-badge"></span>
     </div>
-    <div class="field">
+    <div class="field" id="services-field" style="display:none;">
+      <label>Services / products availed <span style="font-weight:400; color:var(--text-muted);">(tap to select)</span></label>
+      <div class="service-list" id="service-list"></div>
+      <p class="error-text" id="service-error"></p>
+    </div>
+    <div class="field" id="manual-amount-field">
       <label for="amount-input">Amount purchased</label>
       <div class="currency-field">
         <span>PHP</span>
@@ -464,6 +601,13 @@
       </div>
       <p class="error-text" id="amount-error"></p>
     </div>
+    <div class="field" id="discount-field" style="display:none;">
+      <label for="discount-select">Discount <span style="font-weight:400; color:var(--text-muted);">(optional)</span></label>
+      <select id="discount-select">
+        <option value="">No discount</option>
+      </select>
+    </div>
+    <div class="total-line" id="total-line"></div>
     <div class="field">
       <label for="barber-input">Barber</label>
       <input id="barber-input" type="text" list="barber-list" placeholder="Type barber's name" autocomplete="off">
@@ -654,8 +798,187 @@ document.getElementById("btn-register").addEventListener("click", async function
   }
 });
 
+// ---- Service selection ----
+// selectedServices maps a service id to the quantity chosen (0 = not selected)
+var selectedServices = {};
+
+function getSelectedItems(){
+  var catalog = window.__servicesCatalog || [];
+  var items = [];
+  catalog.forEach(function(svc){
+    var qty = selectedServices[svc.id] || 0;
+    if(qty > 0) items.push({ name: svc.name, price: svc.price, qty: qty });
+  });
+  return items;
+}
+
+function renderServiceList(){
+  var catalog = window.__servicesCatalog || [];
+  var servicesField = document.getElementById("services-field");
+  var manualField = document.getElementById("manual-amount-field");
+  var listEl = document.getElementById("service-list");
+
+  // No services configured yet? Fall back to the original manual amount box.
+  if(catalog.length === 0){
+    servicesField.style.display = "none";
+    manualField.style.display = "block";
+    return;
+  }
+  servicesField.style.display = "block";
+  manualField.style.display = "none";
+
+  listEl.innerHTML = "";
+  catalog.forEach(function(svc){
+    var qty = selectedServices[svc.id] || 0;
+    var item = document.createElement("div");
+    item.className = "service-item" + (qty > 0 ? " selected" : "");
+
+    var info = document.createElement("div");
+    info.className = "svc-info";
+    info.innerHTML = "<span class='svc-name'></span><span class='svc-price'>PHP " + svc.price.toLocaleString() + "</span>";
+    info.querySelector(".svc-name").textContent = svc.name;
+    item.appendChild(info);
+
+    if(qty > 0){
+      var qtyBox = document.createElement("div");
+      qtyBox.className = "svc-qty";
+      var minus = document.createElement("button");
+      minus.type = "button"; minus.textContent = "−";
+      var num = document.createElement("span");
+      num.className = "qty-num"; num.textContent = qty;
+      var plus = document.createElement("button");
+      plus.type = "button"; plus.textContent = "+";
+      minus.addEventListener("click", function(e){
+        e.stopPropagation();
+        selectedServices[svc.id] = Math.max(0, (selectedServices[svc.id] || 0) - 1);
+        renderServiceList();
+      });
+      plus.addEventListener("click", function(e){
+        e.stopPropagation();
+        selectedServices[svc.id] = (selectedServices[svc.id] || 0) + 1;
+        renderServiceList();
+      });
+      qtyBox.appendChild(minus); qtyBox.appendChild(num); qtyBox.appendChild(plus);
+      item.appendChild(qtyBox);
+    } else {
+      var check = document.createElement("div");
+      check.className = "svc-check";
+      check.innerHTML = "<svg width='12' height='12' viewBox='0 0 24 24' fill='none'><path d='M5 12.5l4.5 4.5L19 7.5' stroke='currentColor' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/></svg>";
+      item.appendChild(check);
+    }
+
+    item.addEventListener("click", function(){
+      selectedServices[svc.id] = qty > 0 ? 0 : 1;
+      document.getElementById("service-error").textContent = "";
+      renderServiceList();
+    });
+
+    listEl.appendChild(item);
+  });
+  updateTotalLine();
+}
+window.__renderServiceList = renderServiceList;
+
+// ---- Discounts ----
+function getDiscountById(id){
+  var list = window.__discountsCatalog || [];
+  for(var i = 0; i < list.length; i++){
+    if(list[i].id === id) return list[i];
+  }
+  return null;
+}
+
+function getSelectedDiscount(){
+  return getDiscountById(document.getElementById("discount-select").value);
+}
+
+// Returns the peso amount taken off, never more than the subtotal
+function computeDiscountOff(subtotal, disc){
+  if(!disc || subtotal <= 0) return 0;
+  var off = disc.type === "percent" ? subtotal * (disc.value / 100) : disc.value;
+  off = Math.min(off, subtotal);
+  return Math.round(off * 100) / 100;
+}
+
+function discountLabel(disc){
+  return disc.type === "percent"
+    ? disc.name + " (" + disc.value + "% off)"
+    : disc.name + " (PHP " + disc.value.toLocaleString() + " off)";
+}
+
+function renderDiscountOptions(){
+  var list = window.__discountsCatalog || [];
+  var field = document.getElementById("discount-field");
+  var sel = document.getElementById("discount-select");
+  if(list.length === 0){
+    field.style.display = "none";
+    sel.innerHTML = "<option value=''>No discount</option>";
+    updateTotalLine();
+    return;
+  }
+  field.style.display = "block";
+  var previous = sel.value;
+  sel.innerHTML = "";
+  var noneOpt = document.createElement("option");
+  noneOpt.value = "";
+  noneOpt.textContent = "No discount";
+  sel.appendChild(noneOpt);
+  list.forEach(function(disc){
+    var opt = document.createElement("option");
+    opt.value = disc.id;
+    opt.textContent = discountLabel(disc);
+    sel.appendChild(opt);
+  });
+  if(previous && getDiscountById(previous)) sel.value = previous;
+  updateTotalLine();
+}
+window.__renderDiscountOptions = renderDiscountOptions;
+
+// Subtotal comes from the selected services, or from the manual
+// amount box when no services are configured yet
+function currentSubtotal(){
+  var catalog = window.__servicesCatalog || [];
+  if(catalog.length > 0){
+    return getSelectedItems().reduce(function(s, it){ return s + it.price * it.qty; }, 0);
+  }
+  var amt = parseFloat(document.getElementById("amount-input").value);
+  return (amt && amt > 0) ? amt : 0;
+}
+
+function updateTotalLine(){
+  var totalLine = document.getElementById("total-line");
+  var subtotal = currentSubtotal();
+  if(subtotal <= 0){
+    totalLine.style.display = "none";
+    return;
+  }
+  var disc = getSelectedDiscount();
+  var off = computeDiscountOff(subtotal, disc);
+  var total = Math.round((subtotal - off) * 100) / 100;
+  var points = Math.round(total / 20);
+  var pointsText = "earns <b>" + points.toLocaleString() + " point" + (points === 1 ? "" : "s") + "</b>";
+  if(off > 0){
+    totalLine.innerHTML =
+      "PHP " + subtotal.toLocaleString() + " − PHP " + off.toLocaleString() +
+      " discount<br>Total: <b>PHP " + total.toLocaleString() + "</b> · " + pointsText;
+  } else {
+    totalLine.innerHTML = "Total: <b>PHP " + total.toLocaleString() + "</b> · " + pointsText;
+  }
+  totalLine.style.display = "block";
+}
+
+function resetServiceSelection(){
+  selectedServices = {};
+  document.getElementById("discount-select").value = "";
+  renderServiceList();
+  updateTotalLine();
+}
+
+document.getElementById("discount-select").addEventListener("change", updateTotalLine);
+
 document.getElementById("amount-input").addEventListener("input", function(){
   document.getElementById("amount-error").textContent = "";
+  updateTotalLine();
 });
 
 document.getElementById("barber-input").addEventListener("input", function(){
@@ -663,17 +986,34 @@ document.getElementById("barber-input").addEventListener("input", function(){
 });
 
 document.getElementById("btn-add").addEventListener("click", async function(){
-  var amt = parseFloat(document.getElementById("amount-input").value);
   var amountErr = document.getElementById("amount-error");
+  var serviceErr = document.getElementById("service-error");
   var barberInput = document.getElementById("barber-input");
   var barberErr = document.getElementById("barber-error");
   var btn = this;
   var hasError = false;
 
-  if(!amt || amt <= 0){
-    amountErr.textContent = "Enter a valid purchase amount";
-    hasError = true;
+  var catalog = window.__servicesCatalog || [];
+  var usingServices = catalog.length > 0;
+  var subtotal = 0;
+  var servicesPicked = null;
+
+  if(usingServices){
+    servicesPicked = getSelectedItems();
+    if(servicesPicked.length === 0){
+      serviceErr.textContent = "Select at least one service or product";
+      hasError = true;
+    } else {
+      subtotal = servicesPicked.reduce(function(s, it){ return s + it.price * it.qty; }, 0);
+    }
+  } else {
+    subtotal = parseFloat(document.getElementById("amount-input").value);
+    if(!subtotal || subtotal <= 0){
+      amountErr.textContent = "Enter a valid purchase amount";
+      hasError = true;
+    }
   }
+
   var barber = barberInput.value.trim();
   if(!barber){
     barberErr.textContent = "Enter which barber served this client";
@@ -681,9 +1021,12 @@ document.getElementById("btn-add").addEventListener("click", async function(){
   }
   if(hasError) return;
 
+  var disc = getSelectedDiscount();
+  var amountOff = computeDiscountOff(subtotal, disc);
+  var amt = Math.round((subtotal - amountOff) * 100) / 100;
+
   var fb = window.__firebase;
   var earned = Math.round(amt / 20);
-  var barber = barberInput.value.trim();
   setButtonLoading(btn, true, "Add to rewards");
   try{
     var memberRef = fb.doc(fb.firestoreDb, "members", currentNumber);
@@ -693,9 +1036,12 @@ document.getElementById("btn-add").addEventListener("click", async function(){
     var batch = fb.writeBatch(fb.firestoreDb);
     batch.update(memberRef, { totalRewards: fb.increment(earned) });
     batch.set(newVisitRef, {
-      amount: amt,
+      amount: amt, // final amount actually paid, after discount
+      subtotal: subtotal,
+      discount: disc ? { name: disc.name, type: disc.type, value: disc.value, amountOff: amountOff } : null,
       pointsEarned: earned,
       barber: barber,
+      services: servicesPicked, // null for manual-amount entries
       visitedAt: fb.serverTimestamp()
     });
     // Both writes commit together, or neither does — prevents the total
@@ -710,8 +1056,20 @@ document.getElementById("btn-add").addEventListener("click", async function(){
     if(window.__reloadBarberSuggestions) window.__reloadBarberSuggestions();
 
     var newTotal = currentTotalRewards + earned;
+    var itemsNote = "";
+    if(servicesPicked && servicesPicked.length){
+      var names = servicesPicked.map(function(it){
+        return it.qty > 1 ? it.name + " ×" + it.qty : it.name;
+      }).join(", ");
+      itemsNote = "<br><span style='font-size:12px;'>" + names.replace(/</g, "&lt;") + "</span>";
+    }
+    if(disc && amountOff > 0){
+      itemsNote += "<br><span style='font-size:12px;'>" + disc.name.replace(/</g, "&lt;") +
+        " discount applied: −PHP " + amountOff.toLocaleString() + "</span>";
+    }
     document.getElementById("earned-text").innerHTML =
-      "You earned <b>" + earned.toLocaleString() + " points</b> from this PHP " + amt.toLocaleString() + " purchase";
+      "You earned <b>" + earned.toLocaleString() + " points</b> from this PHP " + amt.toLocaleString() + " purchase" + itemsNote;
+    resetServiceSelection();
     document.getElementById("total-points").textContent = newTotal.toLocaleString();
     show("screen-confirm");
 
@@ -741,6 +1099,7 @@ document.getElementById("btn-done").addEventListener("click", function(){
   document.getElementById("email-input").value = "";
   document.getElementById("amount-input").value = "";
   document.getElementById("barber-input").value = "";
+  resetServiceSelection();
   currentNumber = null;
   currentEmail = null;
   currentFirstName = "";
