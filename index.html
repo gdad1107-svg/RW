@@ -99,6 +99,27 @@
     }
   }
   window.addEventListener("DOMContentLoaded", loadServices);
+
+  // Load the discounts configured in the admin page (e.g. Senior Citizen, PWD)
+  window.__discountsCatalog = [];
+  async function loadDiscounts(){
+    try{
+      var snap = await getDocs(collection(firestoreDb, "discounts"));
+      var list = [];
+      snap.forEach(function(docSnap){
+        var data = docSnap.data();
+        if(data.name && (data.type === "percent" || data.type === "fixed") && typeof data.value === "number"){
+          list.push({ id: docSnap.id, name: data.name, type: data.type, value: data.value });
+        }
+      });
+      list.sort(function(a, b){ return a.name.localeCompare(b.name); });
+      window.__discountsCatalog = list;
+      if(window.__renderDiscountOptions) window.__renderDiscountOptions();
+    } catch(e){
+      console.error("Couldn't load discounts:", e);
+    }
+  }
+  window.addEventListener("DOMContentLoaded", loadDiscounts);
 </script>
 
 <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
@@ -535,7 +556,6 @@
       <div class="service-list" id="service-list"></div>
       <p class="error-text" id="service-error"></p>
     </div>
-    <div class="total-line" id="total-line"></div>
     <div class="field" id="manual-amount-field">
       <label for="amount-input">Amount purchased</label>
       <div class="currency-field">
@@ -544,6 +564,13 @@
       </div>
       <p class="error-text" id="amount-error"></p>
     </div>
+    <div class="field" id="discount-field" style="display:none;">
+      <label for="discount-select">Discount <span style="font-weight:400; color:var(--text-muted);">(optional)</span></label>
+      <select id="discount-select">
+        <option value="">No discount</option>
+      </select>
+    </div>
+    <div class="total-line" id="total-line"></div>
     <div class="field">
       <label for="barber-input">Barber</label>
       <input id="barber-input" type="text" list="barber-list" placeholder="Type barber's name" autocomplete="off">
@@ -701,17 +728,91 @@ function getSelectedItems(){
   return items;
 }
 
+// ---- Discounts ----
+function getDiscountById(id){
+  var list = window.__discountsCatalog || [];
+  for(var i = 0; i < list.length; i++){
+    if(list[i].id === id) return list[i];
+  }
+  return null;
+}
+
+function getSelectedDiscount(){
+  return getDiscountById(document.getElementById("discount-select").value);
+}
+
+// Returns the peso amount taken off, never more than the subtotal
+function computeDiscountOff(subtotal, disc){
+  if(!disc || subtotal <= 0) return 0;
+  var off = disc.type === "percent" ? subtotal * (disc.value / 100) : disc.value;
+  off = Math.min(off, subtotal);
+  return Math.round(off * 100) / 100;
+}
+
+function discountLabel(disc){
+  return disc.type === "percent"
+    ? disc.name + " (" + disc.value + "% off)"
+    : disc.name + " (PHP " + disc.value.toLocaleString() + " off)";
+}
+
+function renderDiscountOptions(){
+  var list = window.__discountsCatalog || [];
+  var field = document.getElementById("discount-field");
+  var sel = document.getElementById("discount-select");
+  if(list.length === 0){
+    field.style.display = "none";
+    sel.innerHTML = "<option value=''>No discount</option>";
+    updateTotalLine();
+    return;
+  }
+  field.style.display = "block";
+  var previous = sel.value;
+  sel.innerHTML = "";
+  var noneOpt = document.createElement("option");
+  noneOpt.value = "";
+  noneOpt.textContent = "No discount";
+  sel.appendChild(noneOpt);
+  list.forEach(function(disc){
+    var opt = document.createElement("option");
+    opt.value = disc.id;
+    opt.textContent = discountLabel(disc);
+    sel.appendChild(opt);
+  });
+  if(previous && getDiscountById(previous)) sel.value = previous;
+  updateTotalLine();
+}
+window.__renderDiscountOptions = renderDiscountOptions;
+
+// Subtotal comes from the selected services, or from the manual
+// amount box when no services are configured yet
+function currentSubtotal(){
+  var catalog = window.__servicesCatalog || [];
+  if(catalog.length > 0){
+    return getSelectedItems().reduce(function(s, it){ return s + it.price * it.qty; }, 0);
+  }
+  var amt = parseFloat(document.getElementById("amount-input").value);
+  return (amt && amt > 0) ? amt : 0;
+}
+
 function updateTotalLine(){
   var totalLine = document.getElementById("total-line");
-  var items = getSelectedItems();
-  if(items.length === 0){
+  var subtotal = currentSubtotal();
+  if(subtotal <= 0){
     totalLine.style.display = "none";
     return;
   }
-  var total = items.reduce(function(s, it){ return s + it.price * it.qty; }, 0);
+  var disc = getSelectedDiscount();
+  var off = computeDiscountOff(subtotal, disc);
+  var total = Math.round((subtotal - off) * 100) / 100;
   var points = Math.round(total / 20);
-  totalLine.innerHTML = "Total: <b>PHP " + total.toLocaleString() + "</b> · earns <b>" +
-    points.toLocaleString() + " point" + (points === 1 ? "" : "s") + "</b>";
+  var pointsText = "earns <b>" + points.toLocaleString() + " point" + (points === 1 ? "" : "s") + "</b>";
+  if(off > 0){
+    totalLine.innerHTML =
+      "PHP " + subtotal.toLocaleString() + " − PHP " + off.toLocaleString() +
+      " discount<br>Total: <b>PHP " + total.toLocaleString() + "</b> · " + pointsText;
+  } else {
+    totalLine.innerHTML = "Total: <b>PHP " + total.toLocaleString() + "</b> · " + pointsText;
+  }
   totalLine.style.display = "block";
 }
 
@@ -784,12 +885,17 @@ window.__renderServiceList = renderServiceList;
 
 function resetServiceSelection(){
   selectedServices = {};
+  document.getElementById("discount-select").value = "";
   renderServiceList();
+  updateTotalLine();
 }
 
 document.getElementById("amount-input").addEventListener("input", function(){
   document.getElementById("amount-error").textContent = "";
+  updateTotalLine();
 });
+
+document.getElementById("discount-select").addEventListener("change", updateTotalLine);
 
 document.getElementById("barber-input").addEventListener("input", function(){
   document.getElementById("barber-error").textContent = "";
@@ -805,7 +911,7 @@ document.getElementById("btn-add").addEventListener("click", async function(){
 
   var catalog = window.__servicesCatalog || [];
   var usingServices = catalog.length > 0;
-  var amt = 0;
+  var subtotal = 0;
   var servicesPicked = null;
 
   if(usingServices){
@@ -814,11 +920,11 @@ document.getElementById("btn-add").addEventListener("click", async function(){
       serviceErr.textContent = "Select at least one service or product";
       hasError = true;
     } else {
-      amt = servicesPicked.reduce(function(s, it){ return s + it.price * it.qty; }, 0);
+      subtotal = servicesPicked.reduce(function(s, it){ return s + it.price * it.qty; }, 0);
     }
   } else {
-    amt = parseFloat(document.getElementById("amount-input").value);
-    if(!amt || amt <= 0){
+    subtotal = parseFloat(document.getElementById("amount-input").value);
+    if(!subtotal || subtotal <= 0){
       amountErr.textContent = "Enter a valid purchase amount";
       hasError = true;
     }
@@ -831,6 +937,10 @@ document.getElementById("btn-add").addEventListener("click", async function(){
   }
   if(hasError) return;
 
+  var disc = getSelectedDiscount();
+  var amountOff = computeDiscountOff(subtotal, disc);
+  var amt = Math.round((subtotal - amountOff) * 100) / 100;
+
   var fb = window.__firebase;
   var earned = Math.round(amt / 20);
   setButtonLoading(btn, true, "Add to rewards");
@@ -842,7 +952,9 @@ document.getElementById("btn-add").addEventListener("click", async function(){
     var batch = fb.writeBatch(fb.firestoreDb);
     batch.update(memberRef, { totalRewards: fb.increment(earned) });
     batch.set(newVisitRef, {
-      amount: amt,
+      amount: amt, // final amount actually paid, after discount
+      subtotal: subtotal,
+      discount: disc ? { name: disc.name, type: disc.type, value: disc.value, amountOff: amountOff } : null,
       pointsEarned: earned,
       barber: barber,
       services: servicesPicked, // null for manual-amount entries
@@ -866,6 +978,10 @@ document.getElementById("btn-add").addEventListener("click", async function(){
         return it.qty > 1 ? it.name + " ×" + it.qty : it.name;
       }).join(", ");
       itemsNote = "<br><span style='font-size:12px;'>" + names.replace(/</g, "&lt;") + "</span>";
+    }
+    if(disc && amountOff > 0){
+      itemsNote += "<br><span style='font-size:12px;'>" + disc.name.replace(/</g, "&lt;") +
+        " discount applied: −PHP " + amountOff.toLocaleString() + "</span>";
     }
     document.getElementById("earned-text").innerHTML =
       "You earned <b>" + earned.toLocaleString() + " points</b> from this PHP " + amt.toLocaleString() + " purchase" + itemsNote;

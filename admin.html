@@ -468,6 +468,17 @@
   }
   .svc-add-row .svc-name-in{flex:2; min-width:180px;}
   .svc-add-row .svc-price-in{flex:1; min-width:120px;}
+  .svc-add-row select{
+    height:42px;
+    border-radius:10px;
+    border:1.5px solid var(--gray-light);
+    padding:0 10px;
+    font-size:13px;
+    font-family:'Inter', sans-serif;
+    background:var(--white);
+    flex:1;
+    min-width:130px;
+  }
   .svc-add-row button{
     width:auto;
     height:42px;
@@ -584,6 +595,24 @@
     </div>
     <p class="csv-hint">CSV format: one item per line as <code>name,price</code> — e.g. <code>Haircut,150</code>. A header row like <code>name,price</code> is skipped automatically. Importing a name that already exists updates its price.</p>
     <p class="save-status" id="svc-status"></p>
+  </div>
+
+  <div class="report-section">
+    <p class="report-title">Discounts</p>
+    <p class="report-sub">These appear as an optional dropdown in the customer app — e.g. Senior Citizen or PWD (20%), or peso-amount promos. Points are earned on the discounted total.</p>
+    <div id="discounts-admin-list">
+      <p class="loading-state">Loading discounts...</p>
+    </div>
+    <div class="svc-add-row">
+      <input class="svc-name-in" id="disc-name-input" type="text" placeholder="Discount name (e.g. Senior Citizen)">
+      <select id="disc-type-input">
+        <option value="percent">Percent (%)</option>
+        <option value="fixed">Fixed amount (PHP)</option>
+      </select>
+      <input class="svc-price-in" id="disc-value-input" type="number" min="0" step="0.01" placeholder="Value">
+      <button id="btn-add-discount">Add discount</button>
+    </div>
+    <p class="save-status" id="disc-status"></p>
   </div>
 
   <div class="report-section">
@@ -800,10 +829,15 @@ function renderList(){
       client.visits.forEach(function(v){
         var vRow = document.createElement("div");
         vRow.className = "visit-row";
+        var amountHtml = "PHP " + (v.amount || 0).toLocaleString();
+        if(v.discount && v.discount.amountOff > 0){
+          amountHtml += " <span style='color:var(--green);'>(" + escapeHtml(v.discount.name) +
+            " −PHP " + v.discount.amountOff.toLocaleString() + ")</span>";
+        }
         vRow.innerHTML =
           "<span class='visit-date'>" + formatDate(v.visitedAt) + "</span>" +
           "<span class='visit-barber'>" + (v.barber || "—") + "</span>" +
-          "<span class='visit-amount'>PHP " + (v.amount || 0).toLocaleString() + "</span>" +
+          "<span class='visit-amount'>" + amountHtml + "</span>" +
           "<span class='visit-points'>+" + (v.pointsEarned || 0).toLocaleString() + " pts</span>";
         history.appendChild(vRow);
       });
@@ -1656,6 +1690,136 @@ document.getElementById("btn-import-csv").addEventListener("click", function(){
 });
 
 window.addEventListener("DOMContentLoaded", loadServicesAdmin);
+
+// ---- Discounts management ----
+
+var adminDiscounts = [];
+
+function discountValueLabel(disc){
+  return disc.type === "percent"
+    ? disc.value + "% off"
+    : "PHP " + disc.value.toLocaleString() + " off";
+}
+
+async function loadDiscountsAdmin(){
+  var fb = window.__firebase;
+  var container = document.getElementById("discounts-admin-list");
+  try{
+    var snap = await fb.getDocs(fb.collection(fb.firestoreDb, "discounts"));
+    var list = [];
+    snap.forEach(function(docSnap){
+      var data = docSnap.data();
+      if(data.name && (data.type === "percent" || data.type === "fixed") && typeof data.value === "number"){
+        list.push({ id: docSnap.id, name: data.name, type: data.type, value: data.value });
+      }
+    });
+    list.sort(function(a, b){ return a.name.localeCompare(b.name); });
+    adminDiscounts = list;
+    renderDiscountsAdmin();
+  } catch(e){
+    console.error(e);
+    container.innerHTML = "<p class='no-visits'>Couldn't load discounts. Check your connection and Firestore rules.</p>";
+  }
+}
+
+function renderDiscountsAdmin(){
+  var container = document.getElementById("discounts-admin-list");
+  if(adminDiscounts.length === 0){
+    container.innerHTML = "<p class='no-visits'>No discounts yet. Add one below — a common setup is Senior Citizen 20% and PWD 20%.</p>";
+    return;
+  }
+  container.innerHTML = "";
+  adminDiscounts.forEach(function(disc){
+    var row = document.createElement("div");
+    row.className = "svc-admin-row";
+
+    var nameSpan = document.createElement("span");
+    nameSpan.className = "svc-admin-name";
+    nameSpan.textContent = disc.name;
+
+    var right = document.createElement("div");
+    right.className = "svc-admin-right";
+    var valueSpan = document.createElement("span");
+    valueSpan.className = "svc-admin-price";
+    valueSpan.textContent = discountValueLabel(disc);
+    var delBtn = document.createElement("button");
+    delBtn.className = "svc-delete";
+    delBtn.title = "Remove " + disc.name;
+    delBtn.innerHTML = "&times;";
+    delBtn.addEventListener("click", async function(){
+      if(!confirm("Remove the \"" + disc.name + "\" discount? Past visit records keep their data.")) return;
+      var fb = window.__firebase;
+      delBtn.disabled = true;
+      try{
+        await fb.deleteDoc(fb.doc(fb.firestoreDb, "discounts", disc.id));
+        await loadDiscountsAdmin();
+      } catch(e){
+        console.error(e);
+        delBtn.disabled = false;
+        setDiscStatus("Couldn't remove that discount. Check your connection and try again.", true);
+      }
+    });
+
+    right.appendChild(valueSpan);
+    right.appendChild(delBtn);
+    row.appendChild(nameSpan);
+    row.appendChild(right);
+    container.appendChild(row);
+  });
+}
+
+function setDiscStatus(msg, isError){
+  var status = document.getElementById("disc-status");
+  status.textContent = msg;
+  status.className = "save-status " + (isError ? "error" : "success");
+}
+
+document.getElementById("btn-add-discount").addEventListener("click", async function(){
+  var fb = window.__firebase;
+  var btn = this;
+  var nameInput = document.getElementById("disc-name-input");
+  var typeInput = document.getElementById("disc-type-input");
+  var valueInput = document.getElementById("disc-value-input");
+  var name = nameInput.value.trim();
+  var type = typeInput.value;
+  var value = parseFloat(valueInput.value);
+
+  if(!name){
+    setDiscStatus("Enter a discount name.", true);
+    return;
+  }
+  if(isNaN(value) || value <= 0){
+    setDiscStatus("Enter a value greater than 0.", true);
+    return;
+  }
+  if(type === "percent" && value > 100){
+    setDiscStatus("A percent discount can't be more than 100.", true);
+    return;
+  }
+  var key = serviceKey(name);
+  if(!key){
+    setDiscStatus("That name isn't valid. Use letters or numbers.", true);
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = "Saving...";
+  try{
+    await fb.setDoc(fb.doc(fb.firestoreDb, "discounts", key), { name: name, type: type, value: value }, { merge: true });
+    nameInput.value = "";
+    valueInput.value = "";
+    setDiscStatus("\"" + name + "\" saved (" + discountValueLabel({ type: type, value: value }) + ").", false);
+    await loadDiscountsAdmin();
+  } catch(e){
+    console.error(e);
+    setDiscStatus("Couldn't save. Check your connection and try again.", true);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Add discount";
+  }
+});
+
+window.addEventListener("DOMContentLoaded", loadDiscountsAdmin);
 
 async function loadShopSettings(){
   var fb = window.__firebase;
