@@ -1,7 +1,7 @@
 {
-  "name": "Pabling's Pogi Points",
-  "short_name": "Pogi Points",
-  "description": "Look up or register a member by mobile number and add rewards points for every purchase.",
+  "name": "Gym Rewards",
+  "short_name": "Gym Rewards",
+  "description": "Check in a gym member by mobile number and award rewards points for frequent visits.",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",

@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>Pabling's Pogi Points</title>
+<title>Gym Rewards</title>
 
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#B7945A">
@@ -12,7 +12,7 @@
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Pogi Points">
+<meta name="apple-mobile-web-app-title" content="Gym Rewards">
 <meta name="mobile-web-app-capable" content="yes">
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -51,25 +51,8 @@
   };
   window.__auth = { auth, signInWithEmailAndPassword, signOut };
 
-  // Populate the barber autocomplete list from previously used names
-  async function loadBarberSuggestions(){
-    try{
-      var snap = await getDocs(collection(firestoreDb, "barbers"));
-      var list = document.getElementById("barber-list");
-      list.innerHTML = "";
-      snap.forEach(function(docSnap){
-        var opt = document.createElement("option");
-        opt.value = docSnap.data().name;
-        list.appendChild(opt);
-      });
-    } catch(e){
-      console.error("Couldn't load barber suggestions:", e);
-    }
-  }
-  window.__reloadBarberSuggestions = loadBarberSuggestions;
-
-  // Load the configurable shop/branch name used in reward emails
-  window.__shopName = "Pabling's Pogi Points";
+  // Load the configurable gym name used in reward emails
+  window.__shopName = "Gym Rewards";
   async function loadShopName(){
     try{
       var snap = await getDoc(doc(firestoreDb, "settings", "general"));
@@ -78,27 +61,6 @@
       }
     } catch(e){
       console.error("Couldn't load shop name:", e);
-    }
-  }
-
-  // Load the services & prices configured in the admin page.
-  // If none are configured yet, the app falls back to manual amount entry.
-  window.__servicesCatalog = [];
-  async function loadServices(){
-    try{
-      var snap = await getDocs(collection(firestoreDb, "services"));
-      var list = [];
-      snap.forEach(function(docSnap){
-        var data = docSnap.data();
-        if(data.name && typeof data.price === "number"){
-          list.push({ id: docSnap.id, name: data.name, price: data.price });
-        }
-      });
-      list.sort(function(a, b){ return a.name.localeCompare(b.name); });
-      window.__servicesCatalog = list;
-      if(window.__renderServiceList) window.__renderServiceList();
-    } catch(e){
-      console.error("Couldn't load services:", e);
     }
   }
 
@@ -122,13 +84,28 @@
     }
   }
 
+  // Load the reward-points rules (points per check-in, streak bonus) configured in the admin page
+  window.__rewardSettings = { basePointsPerVisit: 10, bonusPerStreakDay: 2, streakCap: 10 };
+  async function loadRewardSettings(){
+    try{
+      var snap = await getDoc(doc(firestoreDb, "settings", "general"));
+      if(snap.exists()){
+        var data = snap.data();
+        if(typeof data.basePointsPerVisit === "number") window.__rewardSettings.basePointsPerVisit = data.basePointsPerVisit;
+        if(typeof data.bonusPerStreakDay === "number") window.__rewardSettings.bonusPerStreakDay = data.bonusPerStreakDay;
+        if(typeof data.streakCap === "number") window.__rewardSettings.streakCap = data.streakCap;
+      }
+    } catch(e){
+      console.error("Couldn't load reward settings:", e);
+    }
+  }
+
   // Auth gate: the rest of the app only loads data once a staff member is signed in.
   onAuthStateChanged(auth, function(user){
     if(user){
-      loadBarberSuggestions();
       loadShopName();
-      loadServices();
       loadDiscounts();
+      loadRewardSettings();
     }
     if(window.__onAuthChanged) window.__onAuthChanged(user);
   });
@@ -309,11 +286,19 @@
     margin:6px 2px 0;
   }
   .badge-row{
-    display:flex;justify-content:center;margin-bottom:16px;
+    display:flex;justify-content:center;gap:8px;margin-bottom:16px;flex-wrap:wrap;
   }
   .points-badge{
     background:var(--gold-tint);
     color:var(--gold);
+    font-size:12px;
+    font-weight:600;
+    padding:6px 14px;
+    border-radius:100px;
+  }
+  .streak-badge{
+    background:var(--green-tint);
+    color:var(--green);
     font-size:12px;
     font-weight:600;
     padding:6px 14px;
@@ -405,83 +390,6 @@
     background:var(--gold);
     color:var(--on-gold);
   }
-  .service-list{
-    display:flex;
-    flex-direction:column;
-    gap:8px;
-    max-height:280px;
-    overflow-y:auto;
-    padding:2px;
-  }
-  .service-item{
-    display:flex;
-    align-items:center;
-    justify-content:space-between;
-    gap:10px;
-    background:var(--bg-page);
-    border:1.5px solid var(--border-dark);
-    border-radius:12px;
-    padding:11px 14px;
-    cursor:pointer;
-    transition:border-color .15s ease, background .15s ease;
-    -webkit-tap-highlight-color:transparent;
-  }
-  .service-item.selected{
-    border-color:var(--gold);
-    background:var(--gold-tint);
-  }
-  .service-item .svc-info{
-    display:flex;
-    flex-direction:column;
-    gap:2px;
-    min-width:0;
-  }
-  .service-item .svc-name{
-    font-size:14px;
-    font-weight:600;
-    color:var(--text-light);
-  }
-  .service-item .svc-price{
-    font-size:12px;
-    color:var(--text-muted);
-  }
-  .service-item.selected .svc-price{color:var(--gold);}
-  .svc-check{
-    width:22px;height:22px;
-    border-radius:50%;
-    border:1.5px solid var(--border-dark);
-    display:flex;align-items:center;justify-content:center;
-    flex-shrink:0;
-    color:transparent;
-  }
-  .service-item.selected .svc-check{
-    background:var(--gold);
-    border-color:var(--gold);
-    color:var(--on-gold);
-  }
-  .svc-qty{
-    display:flex;
-    align-items:center;
-    gap:8px;
-    flex-shrink:0;
-  }
-  .svc-qty button{
-    width:30px;height:30px;
-    border-radius:8px;
-    background:var(--gold);
-    color:var(--on-gold);
-    font-size:16px;
-    font-weight:600;
-    padding:0;
-    line-height:1;
-  }
-  .svc-qty .qty-num{
-    font-size:14px;
-    font-weight:600;
-    min-width:18px;
-    text-align:center;
-    color:var(--text-light);
-  }
   .total-line{
     display:none;
     background:var(--gold-tint);
@@ -500,13 +408,13 @@
 
 <div class="phone">
   <div class="app-header">
-    <img src="assets/pablings-logo.png" alt="Pabling's Barbershop logo" class="brand-logo">
-    <h1>Pabling's Pogi Points</h1>
-    <p>Earn points on every purchase</p>
+    <img src="assets/pablings-logo.png" alt="Gym logo" class="brand-logo">
+    <h1>Gym Rewards</h1>
+    <p>Earn points every time you visit</p>
   </div>
 
   <div class="install-banner" id="install-banner">
-    <span>Install Pabling's Pogi Points for one-tap access</span>
+    <span>Install Gym Rewards for one-tap access</span>
     <button id="btn-install">Install</button>
   </div>
 
@@ -521,7 +429,7 @@
       <svg viewBox="0 0 24 24" fill="none"><rect x="5" y="10" width="14" height="10" rx="2" stroke="#B7945A" stroke-width="1.8"/><path d="M8 10V7a4 4 0 018 0v3" stroke="#B7945A" stroke-width="1.8" stroke-linecap="round"/><circle cx="12" cy="15" r="1.4" fill="#B7945A"/></svg>
     </div>
     <h2>Staff sign in</h2>
-    <p class="sub">Sign in with your staff account to record purchases</p>
+    <p class="sub">Sign in with your staff account to check members in</p>
     <div class="field">
       <label for="login-email">Email</label>
       <input id="login-email" type="email" placeholder="staff@email.com" autocomplete="username">
@@ -579,27 +487,34 @@
     <button class="btn-primary" id="btn-register">Register</button>
   </div>
 
-  <!-- Screen 3: Purchase amount -->
-  <div class="screen screen-hidden" id="screen-purchase">
+  <!-- Screen 3: Check-in -->
+  <div class="screen screen-hidden" id="screen-checkin">
     <div class="icon-badge">
-      <svg viewBox="0 0 24 24" fill="none"><path d="M6 3h12l1 4H5l1-4z" stroke="#B7945A" stroke-width="1.8" stroke-linejoin="round"/><path d="M5 7l1 13a1 1 0 001 1h10a1 1 0 001-1l1-13" stroke="#B7945A" stroke-width="1.8" stroke-linejoin="round"/><path d="M9 11h6M9 15h4" stroke="#B7945A" stroke-width="1.8" stroke-linecap="round"/></svg>
+      <svg viewBox="0 0 24 24" fill="none"><path d="M5 12.5l4.5 4.5L19 7.5" stroke="#B7945A" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
     </div>
-    <h2 id="purchase-greeting">Enter amount purchased</h2>
+    <h2 id="checkin-greeting">Check in</h2>
     <div class="badge-row" id="badge-row" style="display:none;">
       <span class="points-badge" id="points-badge"></span>
+      <span class="streak-badge" id="streak-badge" style="display:none;"></span>
     </div>
-    <div class="field" id="services-field" style="display:none;">
-      <label>Services / products availed <span style="font-weight:400; color:var(--text-muted);">(tap to select)</span></label>
-      <div class="service-list" id="service-list"></div>
-      <p class="error-text" id="service-error"></p>
-    </div>
-    <div class="field" id="manual-amount-field">
-      <label for="amount-input">Amount purchased</label>
+    <div class="field">
+      <label for="amount-input">Payment collected <span style="font-weight:400; color:var(--text-muted);">(optional — leave blank for a plain check-in)</span></label>
       <div class="currency-field">
         <span>PHP</span>
         <input id="amount-input" type="number" placeholder="0.00" min="0" step="0.01" inputmode="decimal">
       </div>
       <p class="error-text" id="amount-error"></p>
+    </div>
+    <div class="field" id="category-field" style="display:none;">
+      <label for="category-select">What was it for?</label>
+      <select id="category-select">
+        <option value="">Select a category</option>
+        <option value="Membership fee">Membership fee</option>
+        <option value="Day pass">Day pass</option>
+        <option value="Personal training">Personal training</option>
+        <option value="Retail / Other">Retail / Other</option>
+      </select>
+      <p class="error-text" id="category-error"></p>
     </div>
     <div class="field" id="discount-field" style="display:none;">
       <label for="discount-select">Discount <span style="font-weight:400; color:var(--text-muted);">(optional)</span></label>
@@ -608,13 +523,7 @@
       </select>
     </div>
     <div class="total-line" id="total-line"></div>
-    <div class="field">
-      <label for="barber-input">Barber</label>
-      <input id="barber-input" type="text" list="barber-list" placeholder="Type barber's name" autocomplete="off">
-      <datalist id="barber-list"></datalist>
-      <p class="error-text" id="barber-error"></p>
-    </div>
-    <button class="btn-primary" id="btn-add">Add to rewards</button>
+    <button class="btn-primary" id="btn-checkin">Check in</button>
   </div>
 
   <!-- Screen 4: Confirmation -->
@@ -622,7 +531,7 @@
     <div class="icon-badge success">
       <svg viewBox="0 0 24 24" fill="none"><path d="M5 12.5l4.5 4.5L19 7.5" stroke="#1F9D55" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
     </div>
-    <h2>Points added</h2>
+    <h2>Checked in!</h2>
     <p class="earned-line" id="earned-text"></p>
     <div class="summary-card">
       <p class="label">New total rewards points</p>
@@ -635,14 +544,17 @@
 
 <script>
 // Real Firestore-backed data layer.
-// Collection: "members", document ID = mobile number, fields: firstName, lastName, city, totalRewards
+// Collection: "members", document ID = mobile number, fields:
+//   firstName, lastName, city, totalRewards, currentStreak, lastVisitDateKey
 var currentNumber = null;
 var currentTotalRewards = 0;
 var currentEmail = null;
 var currentFirstName = "";
+var currentStreak = 0;
+var currentLastVisitDateKey = null;
 
 function show(id){
-  ["screen-loading","screen-login","screen-phone","screen-new","screen-purchase","screen-confirm"].forEach(function(s){
+  ["screen-loading","screen-login","screen-phone","screen-new","screen-checkin","screen-confirm"].forEach(function(s){
     document.getElementById(s).classList.toggle("screen-hidden", s !== id);
   });
 }
@@ -650,6 +562,17 @@ function show(id){
 function setButtonLoading(btn, loading, label){
   btn.disabled = loading;
   btn.textContent = loading ? "Please wait..." : label;
+}
+
+function pad2(n){ return n < 10 ? "0" + n : "" + n; }
+function toDateKey(date){
+  return date.getFullYear() + "-" + pad2(date.getMonth() + 1) + "-" + pad2(date.getDate());
+}
+function dateKeyMinusDays(key, days){
+  var parts = key.split("-");
+  var d = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+  d.setDate(d.getDate() - days);
+  return toDateKey(d);
 }
 
 // ---- Auth gate ----
@@ -721,19 +644,30 @@ document.getElementById("btn-phone").addEventListener("click", async function(){
     var memberRef = fb.doc(fb.firestoreDb, "members", val);
     var snap = await fb.getDoc(memberRef);
     currentNumber = val;
-    var greeting = document.getElementById("purchase-greeting");
+    var greeting = document.getElementById("checkin-greeting");
     var badgeRow = document.getElementById("badge-row");
     var badge = document.getElementById("points-badge");
+    var streakBadge = document.getElementById("streak-badge");
     if(snap.exists()){
       var record = snap.data();
       currentTotalRewards = record.totalRewards || 0;
       currentEmail = record.email || null;
       currentFirstName = record.firstName || "";
+      currentStreak = record.currentStreak || 0;
+      currentLastVisitDateKey = record.lastVisitDateKey || null;
       greeting.textContent = "Welcome back, " + record.firstName;
       badgeRow.style.display = "flex";
       badge.textContent = "Current points: " + currentTotalRewards.toLocaleString();
-      show("screen-purchase");
+      if(currentStreak > 1){
+        streakBadge.style.display = "inline-block";
+        streakBadge.textContent = currentStreak + "-day streak";
+      } else {
+        streakBadge.style.display = "none";
+      }
+      show("screen-checkin");
     } else {
+      currentStreak = 0;
+      currentLastVisitDateKey = null;
       show("screen-new");
     }
   } catch(e){
@@ -781,15 +715,19 @@ document.getElementById("btn-register").addEventListener("click", async function
       city: city,
       email: email || null,
       emailLower: emailLower,
-      totalRewards: 0
+      totalRewards: 0,
+      currentStreak: 0,
+      lastVisitDateKey: null
     });
     currentTotalRewards = 0;
     currentEmail = email || null;
     currentFirstName = first;
-    var greeting = document.getElementById("purchase-greeting");
+    currentStreak = 0;
+    currentLastVisitDateKey = null;
+    var greeting = document.getElementById("checkin-greeting");
     greeting.textContent = "Registration complete, " + first;
     document.getElementById("badge-row").style.display = "none";
-    show("screen-purchase");
+    show("screen-checkin");
   } catch(e){
     err.textContent = "Couldn't save. Check your connection and try again.";
     console.error(e);
@@ -797,87 +735,6 @@ document.getElementById("btn-register").addEventListener("click", async function
     setButtonLoading(btn, false, "Register");
   }
 });
-
-// ---- Service selection ----
-// selectedServices maps a service id to the quantity chosen (0 = not selected)
-var selectedServices = {};
-
-function getSelectedItems(){
-  var catalog = window.__servicesCatalog || [];
-  var items = [];
-  catalog.forEach(function(svc){
-    var qty = selectedServices[svc.id] || 0;
-    if(qty > 0) items.push({ name: svc.name, price: svc.price, qty: qty });
-  });
-  return items;
-}
-
-function renderServiceList(){
-  var catalog = window.__servicesCatalog || [];
-  var servicesField = document.getElementById("services-field");
-  var manualField = document.getElementById("manual-amount-field");
-  var listEl = document.getElementById("service-list");
-
-  // No services configured yet? Fall back to the original manual amount box.
-  if(catalog.length === 0){
-    servicesField.style.display = "none";
-    manualField.style.display = "block";
-    return;
-  }
-  servicesField.style.display = "block";
-  manualField.style.display = "none";
-
-  listEl.innerHTML = "";
-  catalog.forEach(function(svc){
-    var qty = selectedServices[svc.id] || 0;
-    var item = document.createElement("div");
-    item.className = "service-item" + (qty > 0 ? " selected" : "");
-
-    var info = document.createElement("div");
-    info.className = "svc-info";
-    info.innerHTML = "<span class='svc-name'></span><span class='svc-price'>PHP " + svc.price.toLocaleString() + "</span>";
-    info.querySelector(".svc-name").textContent = svc.name;
-    item.appendChild(info);
-
-    if(qty > 0){
-      var qtyBox = document.createElement("div");
-      qtyBox.className = "svc-qty";
-      var minus = document.createElement("button");
-      minus.type = "button"; minus.textContent = "−";
-      var num = document.createElement("span");
-      num.className = "qty-num"; num.textContent = qty;
-      var plus = document.createElement("button");
-      plus.type = "button"; plus.textContent = "+";
-      minus.addEventListener("click", function(e){
-        e.stopPropagation();
-        selectedServices[svc.id] = Math.max(0, (selectedServices[svc.id] || 0) - 1);
-        renderServiceList();
-      });
-      plus.addEventListener("click", function(e){
-        e.stopPropagation();
-        selectedServices[svc.id] = (selectedServices[svc.id] || 0) + 1;
-        renderServiceList();
-      });
-      qtyBox.appendChild(minus); qtyBox.appendChild(num); qtyBox.appendChild(plus);
-      item.appendChild(qtyBox);
-    } else {
-      var check = document.createElement("div");
-      check.className = "svc-check";
-      check.innerHTML = "<svg width='12' height='12' viewBox='0 0 24 24' fill='none'><path d='M5 12.5l4.5 4.5L19 7.5' stroke='currentColor' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/></svg>";
-      item.appendChild(check);
-    }
-
-    item.addEventListener("click", function(){
-      selectedServices[svc.id] = qty > 0 ? 0 : 1;
-      document.getElementById("service-error").textContent = "";
-      renderServiceList();
-    });
-
-    listEl.appendChild(item);
-  });
-  updateTotalLine();
-}
-window.__renderServiceList = renderServiceList;
 
 // ---- Discounts ----
 function getDiscountById(id){
@@ -916,7 +773,7 @@ function renderDiscountOptions(){
     updateTotalLine();
     return;
   }
-  field.style.display = "block";
+  field.style.display = currentSubtotal() > 0 ? "block" : "none";
   var previous = sel.value;
   sel.innerHTML = "";
   var noneOpt = document.createElement("option");
@@ -934,20 +791,21 @@ function renderDiscountOptions(){
 }
 window.__renderDiscountOptions = renderDiscountOptions;
 
-// Subtotal comes from the selected services, or from the manual
-// amount box when no services are configured yet
 function currentSubtotal(){
-  var catalog = window.__servicesCatalog || [];
-  if(catalog.length > 0){
-    return getSelectedItems().reduce(function(s, it){ return s + it.price * it.qty; }, 0);
-  }
   var amt = parseFloat(document.getElementById("amount-input").value);
   return (amt && amt > 0) ? amt : 0;
 }
 
 function updateTotalLine(){
   var totalLine = document.getElementById("total-line");
+  var discountField = document.getElementById("discount-field");
+  var categoryField = document.getElementById("category-field");
   var subtotal = currentSubtotal();
+
+  categoryField.style.display = subtotal > 0 ? "block" : "none";
+  if(subtotal <= 0) document.getElementById("category-error").textContent = "";
+  discountField.style.display = (subtotal > 0 && (window.__discountsCatalog || []).length > 0) ? "block" : "none";
+
   if(subtotal <= 0){
     totalLine.style.display = "none";
     return;
@@ -955,22 +813,22 @@ function updateTotalLine(){
   var disc = getSelectedDiscount();
   var off = computeDiscountOff(subtotal, disc);
   var total = Math.round((subtotal - off) * 100) / 100;
-  var points = Math.round(total / 20);
-  var pointsText = "earns <b>" + points.toLocaleString() + " point" + (points === 1 ? "" : "s") + "</b>";
   if(off > 0){
     totalLine.innerHTML =
       "PHP " + subtotal.toLocaleString() + " − PHP " + off.toLocaleString() +
-      " discount<br>Total: <b>PHP " + total.toLocaleString() + "</b> · " + pointsText;
+      " discount<br>Total: <b>PHP " + total.toLocaleString() + "</b>";
   } else {
-    totalLine.innerHTML = "Total: <b>PHP " + total.toLocaleString() + "</b> · " + pointsText;
+    totalLine.innerHTML = "Total: <b>PHP " + total.toLocaleString() + "</b>";
   }
   totalLine.style.display = "block";
 }
 
-function resetServiceSelection(){
-  selectedServices = {};
+function resetCheckinForm(){
+  document.getElementById("amount-input").value = "";
+  document.getElementById("category-select").value = "";
   document.getElementById("discount-select").value = "";
-  renderServiceList();
+  document.getElementById("amount-error").textContent = "";
+  document.getElementById("category-error").textContent = "";
   updateTotalLine();
 }
 
@@ -981,42 +839,37 @@ document.getElementById("amount-input").addEventListener("input", function(){
   updateTotalLine();
 });
 
-document.getElementById("barber-input").addEventListener("input", function(){
-  document.getElementById("barber-error").textContent = "";
+document.getElementById("category-select").addEventListener("change", function(){
+  document.getElementById("category-error").textContent = "";
 });
 
-document.getElementById("btn-add").addEventListener("click", async function(){
+// ---- Streak / points math ----
+// Rewards frequent, consecutive-day attendance: a check-in the day right after
+// the last one grows the streak; any gap resets it. Points scale with the streak
+// so members who keep coming back earn more than members who visit the same
+// number of times with gaps in between.
+function computeCheckinPoints(todayKey){
+  var rs = window.__rewardSettings || { basePointsPerVisit: 10, bonusPerStreakDay: 2, streakCap: 10 };
+  if(currentLastVisitDateKey === todayKey){
+    // Already checked in today — no extra points, streak unchanged.
+    return { alreadyCheckedInToday: true, newStreak: currentStreak, pointsEarned: 0 };
+  }
+  var yesterdayKey = dateKeyMinusDays(todayKey, 1);
+  var newStreak = (currentLastVisitDateKey === yesterdayKey) ? currentStreak + 1 : 1;
+  var bonus = Math.min(newStreak - 1, rs.streakCap) * rs.bonusPerStreakDay;
+  return { alreadyCheckedInToday: false, newStreak: newStreak, pointsEarned: rs.basePointsPerVisit + bonus };
+}
+
+document.getElementById("btn-checkin").addEventListener("click", async function(){
   var amountErr = document.getElementById("amount-error");
-  var serviceErr = document.getElementById("service-error");
-  var barberInput = document.getElementById("barber-input");
-  var barberErr = document.getElementById("barber-error");
+  var categoryErr = document.getElementById("category-error");
   var btn = this;
   var hasError = false;
 
-  var catalog = window.__servicesCatalog || [];
-  var usingServices = catalog.length > 0;
-  var subtotal = 0;
-  var servicesPicked = null;
-
-  if(usingServices){
-    servicesPicked = getSelectedItems();
-    if(servicesPicked.length === 0){
-      serviceErr.textContent = "Select at least one service or product";
-      hasError = true;
-    } else {
-      subtotal = servicesPicked.reduce(function(s, it){ return s + it.price * it.qty; }, 0);
-    }
-  } else {
-    subtotal = parseFloat(document.getElementById("amount-input").value);
-    if(!subtotal || subtotal <= 0){
-      amountErr.textContent = "Enter a valid purchase amount";
-      hasError = true;
-    }
-  }
-
-  var barber = barberInput.value.trim();
-  if(!barber){
-    barberErr.textContent = "Enter which barber served this client";
+  var subtotal = currentSubtotal();
+  var category = document.getElementById("category-select").value;
+  if(subtotal > 0 && !category){
+    categoryErr.textContent = "Select what this payment was for";
     hasError = true;
   }
   if(hasError) return;
@@ -1026,50 +879,55 @@ document.getElementById("btn-add").addEventListener("click", async function(){
   var amt = Math.round((subtotal - amountOff) * 100) / 100;
 
   var fb = window.__firebase;
-  var earned = Math.round(amt / 20);
-  setButtonLoading(btn, true, "Add to rewards");
+  var todayKey = toDateKey(new Date());
+  var result = computeCheckinPoints(todayKey);
+
+  setButtonLoading(btn, true, "Check in");
   try{
     var memberRef = fb.doc(fb.firestoreDb, "members", currentNumber);
     var visitsRef = fb.collection(fb.firestoreDb, "members", currentNumber, "visits");
     var newVisitRef = fb.doc(visitsRef);
 
     var batch = fb.writeBatch(fb.firestoreDb);
-    batch.update(memberRef, { totalRewards: fb.increment(earned) });
+    batch.update(memberRef, {
+      totalRewards: fb.increment(result.pointsEarned),
+      currentStreak: result.newStreak,
+      lastVisitDateKey: todayKey
+    });
     batch.set(newVisitRef, {
       amount: amt, // final amount actually paid, after discount
       subtotal: subtotal,
       discount: disc ? { name: disc.name, type: disc.type, value: disc.value, amountOff: amountOff } : null,
-      pointsEarned: earned,
-      barber: barber,
-      services: servicesPicked, // null for manual-amount entries
+      category: subtotal > 0 ? category : null,
+      pointsEarned: result.pointsEarned,
+      streakAtVisit: result.newStreak,
+      checkedInDateKey: todayKey,
       visitedAt: fb.serverTimestamp()
     });
     // Both writes commit together, or neither does — prevents the total
     // and the visit history from ever drifting apart.
     await batch.commit();
 
-    // Save/update this barber name so it appears as a suggestion next time,
-    // keyed by a normalized version of the name to avoid duplicate entries
-    var barberKey = barber.toLowerCase().replace(/\s+/g, "_");
-    var barberRef = fb.doc(fb.firestoreDb, "barbers", barberKey);
-    await fb.setDoc(barberRef, { name: barber }, { merge: true });
-    if(window.__reloadBarberSuggestions) window.__reloadBarberSuggestions();
+    currentStreak = result.newStreak;
+    currentLastVisitDateKey = todayKey;
+    var newTotal = currentTotalRewards + result.pointsEarned;
 
-    var newTotal = currentTotalRewards + earned;
-    var itemsNote = "";
-    if(servicesPicked && servicesPicked.length){
-      var names = servicesPicked.map(function(it){
-        return it.qty > 1 ? it.name + " ×" + it.qty : it.name;
-      }).join(", ");
-      itemsNote = "<br><span style='font-size:12px;'>" + names.replace(/</g, "&lt;") + "</span>";
+    var earnedHtml;
+    if(result.alreadyCheckedInToday){
+      earnedHtml = "You've already checked in today — come back tomorrow to grow your streak.";
+    } else {
+      earnedHtml = "You earned <b>" + result.pointsEarned.toLocaleString() + " points</b> · " +
+        result.newStreak + "-day streak";
+    }
+    if(amt > 0){
+      earnedHtml += "<br><span style='font-size:12px;'>PHP " + amt.toLocaleString() + " (" + category + ") logged</span>";
     }
     if(disc && amountOff > 0){
-      itemsNote += "<br><span style='font-size:12px;'>" + disc.name.replace(/</g, "&lt;") +
+      earnedHtml += "<br><span style='font-size:12px;'>" + disc.name.replace(/</g, "&lt;") +
         " discount applied: −PHP " + amountOff.toLocaleString() + "</span>";
     }
-    document.getElementById("earned-text").innerHTML =
-      "You earned <b>" + earned.toLocaleString() + " points</b> from this PHP " + amt.toLocaleString() + " purchase" + itemsNote;
-    resetServiceSelection();
+    document.getElementById("earned-text").innerHTML = earnedHtml;
+    resetCheckinForm();
     document.getElementById("total-points").textContent = newTotal.toLocaleString();
     show("screen-confirm");
 
@@ -1078,16 +936,17 @@ document.getElementById("btn-add").addEventListener("click", async function(){
         to_email: currentEmail,
         first_name: currentFirstName,
         amount: amt.toLocaleString(),
-        points_earned: earned.toLocaleString(),
+        points_earned: result.pointsEarned.toLocaleString(),
         total_points: newTotal.toLocaleString(),
-        shop_name: window.__shopName || "Pabling's Pogi Points"
+        streak: String(result.newStreak),
+        shop_name: window.__shopName || "Gym Rewards"
       }).catch(function(e){ console.error("Email send failed:", e); });
     }
   } catch(e){
     amountErr.textContent = "Couldn't save. Check your connection and try again.";
     console.error(e);
   } finally {
-    setButtonLoading(btn, false, "Add to rewards");
+    setButtonLoading(btn, false, "Check in");
   }
 });
 
@@ -1097,13 +956,13 @@ document.getElementById("btn-done").addEventListener("click", function(){
   document.getElementById("lastname-input").value = "";
   document.getElementById("city-input").value = "";
   document.getElementById("email-input").value = "";
-  document.getElementById("amount-input").value = "";
-  document.getElementById("barber-input").value = "";
-  resetServiceSelection();
+  resetCheckinForm();
   currentNumber = null;
   currentEmail = null;
   currentFirstName = "";
   currentTotalRewards = 0;
+  currentStreak = 0;
+  currentLastVisitDateKey = null;
   show("screen-phone");
 });
 

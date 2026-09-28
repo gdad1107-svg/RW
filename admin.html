@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PisoPoints Admin</title>
+<title>Gym Rewards Admin</title>
 <link rel="icon" href="icons/icon-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -66,6 +66,7 @@
     --green:#1F9D55;
     --green-tint:#E4F6EA;
     --red:#D64545;
+    --red-tint:#FCEAEA;
   }
   *{box-sizing:border-box;}
   body{
@@ -265,10 +266,12 @@
     padding:8px 0;
     border-bottom:1px dashed var(--gray-light);
     font-size:12.5px;
+    gap:8px;
+    flex-wrap:wrap;
   }
   .visit-row:last-child{border-bottom:none;}
   .visit-date{color:var(--navy); font-weight:500;}
-  .visit-barber{color:var(--blue-dark);}
+  .visit-category{color:var(--blue-dark);}
   .visit-amount{color:var(--gray);}
   .visit-points{color:var(--green); font-weight:600;}
   .empty-state, .loading-state{
@@ -300,60 +303,6 @@
     color:var(--gray);
     margin:0 0 14px;
   }
-  .barber-row{
-    display:flex;
-    align-items:center;
-    justify-content:space-between;
-    padding:9px 0;
-    border-bottom:1px dashed var(--gray-light);
-    font-size:13px;
-  }
-  .barber-row:last-child{border-bottom:none;}
-  .barber-rank{
-    display:flex;
-    align-items:center;
-    gap:10px;
-  }
-  .rank-badge{
-    width:22px;height:22px;
-    border-radius:50%;
-    background:var(--blue-tint);
-    color:var(--blue-dark);
-    font-size:11px;
-    font-weight:700;
-    display:flex;align-items:center;justify-content:center;
-    flex-shrink:0;
-  }
-  .barber-stats{
-    display:flex;
-    gap:16px;
-    font-size:12px;
-    color:var(--gray);
-  }
-  .barber-stats b{color:var(--navy);}
-  .freq-row{
-    display:flex;
-    align-items:center;
-    justify-content:space-between;
-    gap:10px;
-    padding:9px 0;
-    border-bottom:1px dashed var(--gray-light);
-    font-size:13px;
-  }
-  .freq-row:last-child{border-bottom:none;}
-  .freq-name{font-weight:500;}
-  .freq-detail{font-size:11px; color:var(--gray);}
-  .status-pill{
-    font-size:11px;
-    font-weight:600;
-    padding:4px 10px;
-    border-radius:100px;
-    white-space:nowrap;
-  }
-  .status-overdue{background:#FCEAEA; color:var(--red);}
-  .status-due{background:#FFF4E0; color:#B26A00;}
-  .status-ok{background:var(--green-tint); color:var(--green);}
-  .status-none{background:var(--gray-light); color:var(--gray);}
   .report-tabs{
     display:flex;
     gap:8px;
@@ -370,8 +319,6 @@
     border:none;
   }
   .report-tab.active{background:var(--blue); color:var(--white);}
-  .freq-group{display:none;}
-  .freq-group.active{display:block;}
   .sales-row{
     display:flex;
     align-items:center;
@@ -390,6 +337,7 @@
     gap:16px;
     font-size:12px;
     color:var(--gray);
+    flex-wrap:wrap;
   }
   .sales-breakdown b{color:var(--navy);}
   .sales-total{font-weight:700; font-size:14px; color:var(--blue-dark); min-width:110px; text-align:right;}
@@ -398,10 +346,10 @@
     gap:8px;
     margin-bottom:8px;
     align-items:flex-start;
+    flex-wrap:wrap;
   }
-  .txn-row input{flex:1;}
-  .txn-row .txn-amount{flex:1.2;}
-  .txn-row .txn-number{flex:1;}
+  .txn-row input, .txn-row select{flex:1; min-width:130px;}
+  .txn-row .txn-amount{flex:1;}
   .txn-remove{
     width:36px; height:46px;
     flex:none;
@@ -494,7 +442,52 @@
     font-size:13px;
     padding:30px 0;
   }
-  .svc-admin-row{
+  .settings-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fit, minmax(200px, 1fr));
+    gap:10px;
+    margin-bottom:12px;
+  }
+  .settings-grid .field label{
+    display:block; font-size:12px; font-weight:600; margin-bottom:6px; color:var(--navy);
+  }
+  .settings-grid .field input{
+    width:100%; height:44px; border-radius:10px; border:1.5px solid var(--gray-light);
+    padding:0 14px; font-size:13px; font-family:'Inter', sans-serif;
+  }
+  .cashflow-cards{
+    display:grid;
+    grid-template-columns:repeat(auto-fit, minmax(150px, 1fr));
+    gap:12px;
+    margin-bottom:16px;
+  }
+  .cashflow-card{
+    background:var(--blue-tint);
+    border-radius:12px;
+    padding:14px 16px;
+  }
+  .cashflow-card.revenue{background:var(--green-tint);}
+  .cashflow-card.expense{background:var(--red-tint);}
+  .cashflow-card .cf-label{
+    font-size:11px; color:var(--gray); text-transform:uppercase; letter-spacing:0.03em; margin:0 0 4px;
+  }
+  .cashflow-card .cf-value{
+    font-family:'Space Grotesk', sans-serif; font-size:20px; font-weight:700; color:var(--navy); margin:0;
+  }
+  .cashflow-card.revenue .cf-value{color:var(--green);}
+  .cashflow-card.expense .cf-value{color:var(--red);}
+  .cashflow-card.net .cf-value.negative{color:var(--red);}
+  .cashflow-card.net .cf-value.positive{color:var(--green);}
+  .breakdown-row{
+    display:flex;
+    justify-content:space-between;
+    padding:7px 0;
+    border-bottom:1px dashed var(--gray-light);
+    font-size:12.5px;
+  }
+  .breakdown-row:last-child{border-bottom:none;}
+  .breakdown-row b{color:var(--navy);}
+  .expense-row{
     display:flex;
     align-items:center;
     justify-content:space-between;
@@ -503,98 +496,21 @@
     border-bottom:1px dashed var(--gray-light);
     font-size:13px;
   }
-  .svc-admin-row:last-child{border-bottom:none;}
-  .svc-admin-name{font-weight:500;}
-  .svc-admin-right{
-    display:flex;
-    align-items:center;
-    gap:14px;
-  }
-  .svc-admin-price{font-weight:600; color:var(--blue-dark);}
-  .svc-delete{
+  .expense-row:last-child{border-bottom:none;}
+  .expense-info{display:flex; flex-direction:column; gap:2px;}
+  .expense-cat{font-weight:600;}
+  .expense-meta{font-size:11px; color:var(--gray);}
+  .expense-right{display:flex; align-items:center; gap:12px;}
+  .expense-amount{font-weight:700; color:var(--red);}
+  .expense-delete{
     width:30px; height:30px;
-    background:#FCEAEA;
+    background:var(--red-tint);
     color:var(--red);
     border:none;
     border-radius:8px;
     font-size:15px;
     cursor:pointer;
     line-height:1;
-  }
-  .svc-add-row{
-    display:flex;
-    gap:8px;
-    margin-top:14px;
-    flex-wrap:wrap;
-  }
-  .svc-add-row input{
-    height:42px;
-    border-radius:10px;
-    border:1.5px solid var(--gray-light);
-    padding:0 12px;
-    font-size:13px;
-    font-family:'Inter', sans-serif;
-  }
-  .svc-add-row .svc-name-in{flex:2; min-width:180px;}
-  .svc-add-row .svc-price-in{flex:1; min-width:120px;}
-  .svc-add-row select{
-    height:42px;
-    border-radius:10px;
-    border:1.5px solid var(--gray-light);
-    padding:0 10px;
-    font-size:13px;
-    font-family:'Inter', sans-serif;
-    background:var(--white);
-    flex:1;
-    min-width:130px;
-  }
-  .svc-add-row button{
-    width:auto;
-    height:42px;
-    padding:0 18px;
-    background:var(--blue);
-    color:var(--white);
-    border:none;
-    border-radius:10px;
-    font-size:13px;
-    font-weight:600;
-    font-family:'Inter', sans-serif;
-    cursor:pointer;
-  }
-  .svc-import-row{
-    display:flex;
-    gap:8px;
-    margin-top:12px;
-    align-items:center;
-    flex-wrap:wrap;
-  }
-  .svc-import-row input[type=file]{
-    font-size:12px;
-    font-family:'Inter', sans-serif;
-  }
-  .svc-import-row button{
-    width:auto;
-    height:36px;
-    padding:0 14px;
-    background:var(--blue-tint);
-    color:var(--blue-dark);
-    border:none;
-    border-radius:8px;
-    font-size:12px;
-    font-weight:600;
-    font-family:'Inter', sans-serif;
-    cursor:pointer;
-  }
-  .csv-hint{
-    font-size:11px;
-    color:var(--gray);
-    margin:8px 0 0;
-  }
-  .csv-hint code{
-    background:var(--blue-tint);
-    padding:1px 5px;
-    border-radius:4px;
-    font-size:11px;
   }
 </style>
 </head>
@@ -619,17 +535,17 @@
 
 <header class="app-only">
   <div>
-    <h1>PisoPoints Admin</h1>
-    <p>Client list, visit frequency, and barber history</p>
+    <h1>Gym Rewards Admin</h1>
+    <p>Members, attendance, and cash flow</p>
   </div>
   <div class="stats">
     <div class="stat-card">
       <div class="num" id="stat-clients">–</div>
-      <div class="label">Clients</div>
+      <div class="label">Members</div>
     </div>
     <div class="stat-card">
       <div class="num" id="stat-visits">–</div>
-      <div class="label">Total visits</div>
+      <div class="label">Check-ins</div>
     </div>
     <div class="stat-card">
       <div class="num" id="stat-points">–</div>
@@ -646,18 +562,6 @@
   </div>
 </div>
 
-<div class="app-only" style="max-width:1000px; margin:16px auto 0; padding:0 16px;">
-  <div class="report-section" style="margin-bottom:0;">
-    <p class="report-title">Shop settings</p>
-    <p class="report-sub">This name is used in the reward confirmation emails sent to customers</p>
-    <div style="display:flex; gap:10px; flex-wrap:wrap;">
-      <input id="shop-name-input" type="text" placeholder="e.g. PisoPoints Barbershop - Marikina" style="flex:1; min-width:220px; height:44px; border-radius:10px; border:1.5px solid var(--gray-light); padding:0 14px; font-size:13px; font-family:'Inter', sans-serif;">
-      <button id="btn-save-shop-name" style="width:auto; height:44px; padding:0 18px; background:var(--blue); color:white; border-radius:10px;">Save</button>
-    </div>
-    <p class="save-status" id="shop-name-status"></p>
-  </div>
-</div>
-
 <main class="app-only">
   <div class="page-tabs">
     <button class="page-tab active" data-page-tab="overview">Overview</button>
@@ -665,54 +569,77 @@
   </div>
 
   <div id="page-overview" class="page-content active">
+
   <div class="report-section">
-    <p class="report-title">Services & prices</p>
-    <p class="report-sub">These appear as a selectable list in the customer app, so the front desk taps the services availed instead of typing an amount</p>
-    <div id="services-admin-list">
-      <p class="loading-state">Loading services...</p>
+    <p class="report-title">Gym & rewards settings</p>
+    <p class="report-sub">The gym name appears in reward confirmation emails. The points settings control how check-ins earn rewards.</p>
+    <div class="settings-grid">
+      <div class="field">
+        <label for="shop-name-input">Gym name</label>
+        <input id="shop-name-input" type="text" placeholder="e.g. Pabling's Fitness Gym">
+      </div>
+      <div class="field">
+        <label for="base-points-input">Points per check-in</label>
+        <input id="base-points-input" type="number" min="0" step="1" placeholder="10">
+      </div>
+      <div class="field">
+        <label for="bonus-points-input">Bonus points per streak day</label>
+        <input id="bonus-points-input" type="number" min="0" step="1" placeholder="2">
+      </div>
+      <div class="field">
+        <label for="streak-cap-input">Max streak bonus (days)</label>
+        <input id="streak-cap-input" type="number" min="0" step="1" placeholder="10">
+      </div>
     </div>
-    <div class="svc-add-row">
-      <input class="svc-name-in" id="svc-name-input" type="text" placeholder="Service or product name (e.g. Haircut)">
-      <input class="svc-price-in" id="svc-price-input" type="number" min="0" step="0.01" placeholder="Price (PHP)">
-      <button id="btn-add-service">Add service</button>
-    </div>
-    <div class="svc-import-row">
-      <input type="file" id="svc-csv-input" accept=".csv,text/csv,text/plain">
-      <button id="btn-import-csv">Import CSV</button>
-    </div>
-    <p class="csv-hint">CSV format: one item per line as <code>name,price</code> — e.g. <code>Haircut,150</code>. A header row like <code>name,price</code> is skipped automatically. Importing a name that already exists updates its price.</p>
-    <p class="save-status" id="svc-status"></p>
+    <button id="btn-save-shop-name" style="width:auto; height:44px; padding:0 18px; background:var(--blue); color:white; border-radius:10px;">Save settings</button>
+    <p class="save-status" id="shop-name-status"></p>
   </div>
 
   <div class="report-section">
-    <p class="report-title">Discounts</p>
-    <p class="report-sub">These appear as an optional dropdown in the customer app — e.g. Senior Citizen or PWD (20%), or peso-amount promos. Points are earned on the discounted total.</p>
-    <div id="discounts-admin-list">
-      <p class="loading-state">Loading discounts...</p>
+    <p class="report-title">Cash flow overview</p>
+    <p class="report-sub">Revenue collected (check-ins + walk-ins) versus logged expenses</p>
+    <div class="report-tabs">
+      <button class="report-tab active" data-cf-period="daily">Today</button>
+      <button class="report-tab" data-cf-period="weekly">This week</button>
+      <button class="report-tab" data-cf-period="monthly">This month</button>
     </div>
-    <div class="svc-add-row">
-      <input class="svc-name-in" id="disc-name-input" type="text" placeholder="Discount name (e.g. Senior Citizen)">
-      <select id="disc-type-input">
-        <option value="percent">Percent (%)</option>
-        <option value="fixed">Fixed amount (PHP)</option>
-      </select>
-      <input class="svc-price-in" id="disc-value-input" type="number" min="0" step="0.01" placeholder="Value">
-      <button id="btn-add-discount">Add discount</button>
+    <div class="cashflow-cards">
+      <div class="cashflow-card revenue">
+        <p class="cf-label">Revenue</p>
+        <p class="cf-value" id="cf-revenue-total">PHP 0</p>
+      </div>
+      <div class="cashflow-card expense">
+        <p class="cf-label">Expenses</p>
+        <p class="cf-value" id="cf-expense-total">PHP 0</p>
+      </div>
+      <div class="cashflow-card net">
+        <p class="cf-label">Net cash flow</p>
+        <p class="cf-value" id="cf-net-total">PHP 0</p>
+      </div>
     </div>
-    <p class="save-status" id="disc-status"></p>
+    <div style="display:flex; gap:24px; flex-wrap:wrap;">
+      <div style="flex:1; min-width:220px;">
+        <p class="report-sub" style="margin-bottom:6px; font-weight:600;">Revenue by category</p>
+        <div id="cf-revenue-breakdown"></div>
+      </div>
+      <div style="flex:1; min-width:220px;">
+        <p class="report-sub" style="margin-bottom:6px; font-weight:600;">Expenses by category</p>
+        <div id="cf-expense-breakdown"></div>
+      </div>
+    </div>
   </div>
 
   <div class="report-section">
-    <p class="report-title">Daily sales</p>
-    <p class="report-sub">App-tracked sales combined with manually logged walk-in transactions</p>
+    <p class="report-title">Revenue log</p>
+    <p class="report-sub">Check-in payments combined with manually logged walk-in transactions, by day</p>
     <div id="sales-report">
-      <p class="loading-state">Loading sales data...</p>
+      <p class="loading-state">Loading revenue data...</p>
     </div>
   </div>
 
   <div class="report-section">
     <p class="report-title">Log walk-in transactions</p>
-    <p class="report-sub">For customers who paid without using the app. Add as many transactions as needed, then save them all at once.</p>
+    <p class="report-sub">For members or guests who paid without using the check-in app. Add as many transactions as needed, then save them all at once.</p>
     <div class="manual-date-row">
       <label for="manual-date-input">Date these transactions belong to</label>
       <input id="manual-date-input" type="date">
@@ -726,26 +653,47 @@
   </div>
 
   <div class="report-section">
-    <p class="report-title">Barber performance</p>
-    <p class="report-sub">Ranked by number of visits served</p>
-    <div id="barber-report"></div>
-  </div>
-
-  <div class="report-section">
-    <p class="report-title">Top services & products</p>
-    <p class="report-sub">Ranked by how many times each item was availed</p>
-    <div id="service-report"></div>
-  </div>
-
-  <div class="report-section">
-    <p class="report-title">Visit frequency & who's due</p>
-    <p class="report-sub">Based on each client's average time between visits</p>
-    <div class="report-tabs">
-      <button class="report-tab active" data-group="due">Due / overdue</button>
-      <button class="report-tab" data-group="ok">Not due yet</button>
-      <button class="report-tab" data-group="none">Not enough data</button>
+    <p class="report-title">Expenses</p>
+    <p class="report-sub">Log gym expenses so cash flow reflects money going out, not just money coming in</p>
+    <div id="expense-list">
+      <p class="loading-state">Loading expenses...</p>
     </div>
-    <div id="freq-report"></div>
+    <div class="manual-date-row">
+      <label for="expense-date-input">Date</label>
+      <input id="expense-date-input" type="date">
+    </div>
+    <div style="display:flex; gap:8px; flex-wrap:wrap;">
+      <select id="expense-category-input" style="height:42px; border-radius:10px; border:1.5px solid var(--gray-light); padding:0 10px; font-size:13px; font-family:'Inter', sans-serif; background:var(--white); flex:1; min-width:150px;">
+        <option value="Rent">Rent</option>
+        <option value="Utilities">Utilities</option>
+        <option value="Staff wages">Staff wages</option>
+        <option value="Equipment">Equipment</option>
+        <option value="Marketing">Marketing</option>
+        <option value="Other">Other</option>
+      </select>
+      <input id="expense-amount-input" type="number" min="0" step="0.01" placeholder="Amount (PHP)" style="flex:1; min-width:120px; height:42px; border-radius:10px; border:1.5px solid var(--gray-light); padding:0 12px; font-size:13px; font-family:'Inter', sans-serif;">
+      <input id="expense-note-input" type="text" placeholder="Note (optional)" style="flex:2; min-width:160px; height:42px; border-radius:10px; border:1.5px solid var(--gray-light); padding:0 12px; font-size:13px; font-family:'Inter', sans-serif;">
+      <button id="btn-add-expense" style="width:auto; height:42px; padding:0 18px; background:var(--blue); color:white; border:none; border-radius:10px; font-size:13px; font-weight:600; font-family:'Inter', sans-serif; cursor:pointer;">Add expense</button>
+    </div>
+    <p class="save-status" id="expense-status"></p>
+  </div>
+
+  <div class="report-section">
+    <p class="report-title">Discounts</p>
+    <p class="report-sub">These appear as an optional dropdown in the check-in app — e.g. Senior Citizen or PWD (20%), or peso-amount promos. Points aren't affected by discounts; they're earned for the check-in itself.</p>
+    <div id="discounts-admin-list">
+      <p class="loading-state">Loading discounts...</p>
+    </div>
+    <div style="display:flex; gap:8px; flex-wrap:wrap;">
+      <input id="disc-name-input" type="text" placeholder="Discount name (e.g. Senior Citizen)" style="flex:2; min-width:180px; height:42px; border-radius:10px; border:1.5px solid var(--gray-light); padding:0 12px; font-size:13px; font-family:'Inter', sans-serif;">
+      <select id="disc-type-input" style="height:42px; border-radius:10px; border:1.5px solid var(--gray-light); padding:0 10px; font-size:13px; font-family:'Inter', sans-serif; background:var(--white); flex:1; min-width:130px;">
+        <option value="percent">Percent (%)</option>
+        <option value="fixed">Fixed amount (PHP)</option>
+      </select>
+      <input id="disc-value-input" type="number" min="0" step="0.01" placeholder="Value" style="flex:1; min-width:120px; height:42px; border-radius:10px; border:1.5px solid var(--gray-light); padding:0 12px; font-size:13px; font-family:'Inter', sans-serif;">
+      <button id="btn-add-discount" style="width:auto; height:42px; padding:0 18px; background:var(--blue); color:white; border:none; border-radius:10px; font-size:13px; font-weight:600; font-family:'Inter', sans-serif; cursor:pointer;">Add discount</button>
+    </div>
+    <p class="save-status" id="disc-status"></p>
   </div>
 
   <div class="toolbar">
@@ -758,7 +706,7 @@
     </select>
   </div>
   <div id="list-container">
-    <p class="loading-state">Loading clients...</p>
+    <p class="loading-state">Loading members...</p>
   </div>
   </div>
 
@@ -767,7 +715,7 @@
       <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:4px;">
         <div>
           <p class="report-title" style="margin-bottom:0;">Charts</p>
-          <p class="report-sub" style="margin-bottom:0;">View sales trend and barber activity by period</p>
+          <p class="report-sub" style="margin-bottom:0;">View revenue and expense trends by period</p>
         </div>
         <div class="report-tabs" style="margin-bottom:0;">
           <button class="period-tab active" data-period="daily">Daily</button>
@@ -778,27 +726,22 @@
     </div>
 
     <div class="report-section">
-      <p class="report-title">Sales trend</p>
-      <p class="report-sub" id="sales-trend-sub">Total sales (app + walk-in) per day, most recent 14 days</p>
+      <p class="report-title">Revenue trend</p>
+      <p class="report-sub" id="sales-trend-sub">Total revenue (check-ins + walk-in) per day, most recent 14 days</p>
       <div id="sales-trend-chart"></div>
     </div>
 
     <div class="report-section">
-      <p class="report-title">Visits per barber</p>
-      <p class="report-sub" id="barber-count-sub">Number of clients served today</p>
-      <div id="barber-count-chart"></div>
-    </div>
-
-    <div class="report-section">
-      <p class="report-title">Services & products availed</p>
-      <p class="report-sub" id="service-count-sub">Times each item was availed today</p>
-      <div id="service-count-chart"></div>
+      <p class="report-title">Expenses trend</p>
+      <p class="report-sub" id="expense-trend-sub">Total expenses per day, most recent 14 days</p>
+      <div id="expense-trend-chart"></div>
     </div>
   </div>
 </main>
 
 <script>
 var allClients = [];
+var allExpenses = [];
 
 // ---- Auth gate ----
 var dashboardStarted = false;
@@ -814,7 +757,6 @@ window.__onAdminAuth = function(state){
     if(!dashboardStarted){
       dashboardStarted = true;
       loadShopSettings();
-      loadServicesAdmin();
       loadDiscountsAdmin();
       loadClients();
     }
@@ -903,6 +845,7 @@ async function loadClients(){
         city: data.city || "",
         email: data.email || null,
         totalRewards: data.totalRewards || 0,
+        currentStreak: data.currentStreak || 0,
         visitCount: visits.length,
         lastVisit: visits.length ? visits[0].visitedAt : null,
         visits: visits
@@ -913,15 +856,13 @@ async function loadClients(){
     document.getElementById("stat-clients").textContent = clients.length.toLocaleString();
     document.getElementById("stat-visits").textContent = totalVisits.toLocaleString();
     document.getElementById("stat-points").textContent = totalPoints.toLocaleString();
-    renderBarberReport(clients);
-    renderServiceReport(clients);
-    renderFrequencyReport(clients);
     renderList();
     checkForMismatches(clients);
-    refreshSalesReport();
+    await loadExpenses();
+    await refreshSalesReport();
   } catch(e){
     console.error(e);
-    container.innerHTML = "<p class='empty-state'>Couldn't load client data. Check your connection and Firestore rules.</p>";
+    container.innerHTML = "<p class='empty-state'>Couldn't load member data. Check your connection and Firestore rules.</p>";
   }
 }
 
@@ -946,7 +887,7 @@ function renderList(){
   });
 
   if(filtered.length === 0){
-    container.innerHTML = "<p class='empty-state'>No clients found.</p>";
+    container.innerHTML = "<p class='empty-state'>No members found.</p>";
     return;
   }
 
@@ -963,10 +904,11 @@ function renderList(){
     row.innerHTML =
       "<div class='client-info'>" +
         "<div class='client-name'>" + client.firstName + " " + client.lastName + "</div>" +
-        "<div class='client-meta'>" + client.id + (client.city ? " · " + client.city : "") + "</div>" +
+        "<div class='client-meta'>" + client.id + (client.city ? " · " + client.city : "") +
+          (client.currentStreak > 1 ? " · " + client.currentStreak + "-day streak" : "") + "</div>" +
       "</div>" +
       "<div class='client-metrics'>" +
-        "<div class='metric'><div class='value'>" + client.visitCount + "</div><div class='label'>Visits</div></div>" +
+        "<div class='metric'><div class='value'>" + client.visitCount + "</div><div class='label'>Check-ins</div></div>" +
         "<div class='metric'><div class='value'>" + client.totalRewards.toLocaleString() + "</div><div class='label'>Points</div></div>" +
         "<svg class='chevron' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2'><path d='M6 9l6 6 6-6'/></svg>" +
       "</div>";
@@ -978,19 +920,19 @@ function renderList(){
     var history = document.createElement("div");
     history.className = "visit-history";
     if(client.visits.length === 0){
-      history.innerHTML = "<p class='no-visits'>No visits recorded yet.</p>";
+      history.innerHTML = "<p class='no-visits'>No check-ins recorded yet.</p>";
     } else {
       client.visits.forEach(function(v){
         var vRow = document.createElement("div");
         vRow.className = "visit-row";
-        var amountHtml = "PHP " + (v.amount || 0).toLocaleString();
+        var amountHtml = v.amount > 0 ? "PHP " + v.amount.toLocaleString() : "—";
         if(v.discount && v.discount.amountOff > 0){
           amountHtml += " <span style='color:var(--green);'>(" + escapeHtml(v.discount.name) +
             " −PHP " + v.discount.amountOff.toLocaleString() + ")</span>";
         }
         vRow.innerHTML =
           "<span class='visit-date'>" + formatDate(v.visitedAt) + "</span>" +
-          "<span class='visit-barber'>" + (v.barber || "—") + "</span>" +
+          "<span class='visit-category'>" + (v.category || "Check-in") + "</span>" +
           "<span class='visit-amount'>" + amountHtml + "</span>" +
           "<span class='visit-points'>+" + (v.pointsEarned || 0).toLocaleString() + " pts</span>";
         history.appendChild(vRow);
@@ -1024,6 +966,7 @@ function computeAppSalesByDate(clients){
   var map = {};
   clients.forEach(function(c){
     c.visits.forEach(function(v){
+      if(!(v.amount > 0)) return;
       var d = getVisitDate(v);
       if(!d) return;
       var key = toDateKey(d);
@@ -1038,6 +981,7 @@ function computeAppSalesByDate(clients){
 var manualSalesByDate = {};
 var lastAppSalesByDate = {};
 var currentChartPeriod = "daily";
+var currentCfPeriod = "daily";
 
 async function loadManualSales(){
   var fb = window.__firebase;
@@ -1067,7 +1011,7 @@ function renderSalesReport(appMap, manualMap){
 
   var dateKeys = Object.keys(allDateKeys).sort().reverse();
   if(dateKeys.length === 0){
-    container.innerHTML = "<p class='no-visits'>No sales recorded yet.</p>";
+    container.innerHTML = "<p class='no-visits'>No revenue recorded yet.</p>";
     return;
   }
 
@@ -1083,7 +1027,7 @@ function renderSalesReport(appMap, manualMap){
     row.innerHTML =
       "<span class='sales-date'>" + formatDateKeyDisplay(key) + "</span>" +
       "<span class='sales-breakdown'>" +
-        "<span>App: <b>PHP " + app.amount.toLocaleString() + "</b> (" + app.count + ")</span>" +
+        "<span>Check-ins: <b>PHP " + app.amount.toLocaleString() + "</b> (" + app.count + ")</span>" +
         "<span>Walk-in: <b>PHP " + manual.amount.toLocaleString() + "</b> (" + manual.count + ")</span>" +
       "</span>" +
       "<span class='sales-total'>PHP " + total.toLocaleString() + "</span>";
@@ -1096,10 +1040,12 @@ async function refreshSalesReport(){
   lastAppSalesByDate = appMap;
   var manualMap = await loadManualSales();
   renderSalesReport(appMap, manualMap);
+  renderCashflowOverview();
   renderCharts();
 }
 
 // ---- Manual transaction entry form ----
+var REVENUE_CATS = ["Membership fee", "Day pass", "Personal training", "Retail / Other"];
 var txnRowCounter = 0;
 
 function addTxnRow(){
@@ -1109,8 +1055,10 @@ function addTxnRow(){
   var row = document.createElement("div");
   row.className = "txn-row";
   row.dataset.rowId = id;
+  var catOptions = REVENUE_CATS.map(function(c){ return "<option value='" + c + "'>" + c + "</option>"; }).join("");
   row.innerHTML =
     "<input class='txn-amount' type='number' min='0' step='0.01' placeholder='Amount (PHP)' data-field='amount'>" +
+    "<select class='txn-category' data-field='category'>" + catOptions + "</select>" +
     "<input class='txn-number' type='text' placeholder='Transaction / OR number' data-field='transactionNumber'>" +
     "<button type='button' class='txn-remove' title='Remove'>&times;</button>";
   row.querySelector(".txn-remove").addEventListener("click", function(){
@@ -1127,6 +1075,7 @@ document.getElementById("btn-add-txn-row").addEventListener("click", addTxnRow);
 
 document.getElementById("manual-date-input").value = toDateKey(new Date());
 addTxnRow();
+document.getElementById("expense-date-input").value = toDateKey(new Date());
 
 document.getElementById("btn-submit-txns").addEventListener("click", async function(){
   var fb = window.__firebase;
@@ -1139,6 +1088,7 @@ document.getElementById("btn-submit-txns").addEventListener("click", async funct
   var hasError = false;
   rows.forEach(function(row){
     var amount = parseFloat(row.querySelector(".txn-amount").value);
+    var category = row.querySelector(".txn-category").value;
     var txnNumber = row.querySelector(".txn-number").value.trim();
     var isBlank = !row.querySelector(".txn-amount").value && !txnNumber;
     if(isBlank) return; // skip fully empty rows silently
@@ -1146,7 +1096,7 @@ document.getElementById("btn-submit-txns").addEventListener("click", async funct
       hasError = true;
       return;
     }
-    entries.push({ amount: amount, transactionNumber: txnNumber });
+    entries.push({ amount: amount, category: category, transactionNumber: txnNumber });
   });
 
   if(hasError){
@@ -1166,6 +1116,7 @@ document.getElementById("btn-submit-txns").addEventListener("click", async funct
     for(var i = 0; i < entries.length; i++){
       await fb.addDoc(fb.collection(fb.firestoreDb, "manualSales"), {
         amount: entries[i].amount,
+        category: entries[i].category,
         transactionNumber: entries[i].transactionNumber,
         dateKey: dateKey,
         enteredAt: fb.serverTimestamp()
@@ -1192,213 +1143,12 @@ function getVisitDate(v){
   return v.visitedAt.toDate ? v.visitedAt.toDate() : new Date(v.visitedAt);
 }
 
-function renderBarberReport(clients){
-  var barberMap = {};
-  clients.forEach(function(c){
-    c.visits.forEach(function(v){
-      var name = v.barber || "Unspecified";
-      if(!barberMap[name]) barberMap[name] = { visits: 0, clients: {} };
-      barberMap[name].visits += 1;
-      barberMap[name].clients[c.id] = true;
-    });
-  });
-
-  var barbers = Object.keys(barberMap).map(function(name){
-    return {
-      name: name,
-      visits: barberMap[name].visits,
-      clientCount: Object.keys(barberMap[name].clients).length
-    };
-  });
-  barbers.sort(function(a, b){ return b.visits - a.visits; });
-
-  var container = document.getElementById("barber-report");
-  if(barbers.length === 0){
-    container.innerHTML = "<p class='no-visits'>No visits recorded yet — check back once purchases start coming in.</p>";
-    return;
-  }
-  container.innerHTML = "";
-  barbers.forEach(function(b, i){
-    var row = document.createElement("div");
-    row.className = "barber-row";
-    row.innerHTML =
-      "<div class='barber-rank'><span class='rank-badge'>" + (i+1) + "</span><span>" + b.name + "</span></div>" +
-      "<div class='barber-stats'><span><b>" + b.visits + "</b> visits</span><span><b>" + b.clientCount + "</b> clients</span></div>";
-    container.appendChild(row);
-  });
-}
-
-// Aggregates the services arrays saved on each visit.
-// Visits recorded before service tracking existed have no services data and are skipped.
-function aggregateServices(clients, rangeStart, rangeEnd){
-  var map = {}; // name -> { count, revenue }
-  clients.forEach(function(c){
-    c.visits.forEach(function(v){
-      if(!v.services || !v.services.length) return;
-      if(rangeStart || rangeEnd){
-        var d = getVisitDate(v);
-        if(!d || (rangeStart && d < rangeStart) || (rangeEnd && d > rangeEnd)) return;
-      }
-      v.services.forEach(function(item){
-        if(!item || !item.name) return;
-        var qty = item.qty || 1;
-        var price = item.price || 0;
-        if(!map[item.name]) map[item.name] = { count: 0, revenue: 0 };
-        map[item.name].count += qty;
-        map[item.name].revenue += price * qty;
-      });
-    });
-  });
-  return map;
-}
-
-function renderServiceReport(clients){
-  var map = aggregateServices(clients);
-  var items = Object.keys(map).map(function(name){
-    return { name: name, count: map[name].count, revenue: map[name].revenue };
-  });
-  items.sort(function(a, b){ return b.count - a.count; });
-
-  var container = document.getElementById("service-report");
-  if(items.length === 0){
-    container.innerHTML = "<p class='no-visits'>No service data yet. This fills in as new purchases are recorded with the service list. Visits saved before service tracking was added won't appear here.</p>";
-    return;
-  }
-  container.innerHTML = "";
-  items.forEach(function(item, i){
-    var row = document.createElement("div");
-    row.className = "barber-row";
-    var nameSpan = document.createElement("span");
-    nameSpan.textContent = item.name;
-    row.innerHTML =
-      "<div class='barber-rank'><span class='rank-badge'>" + (i+1) + "</span></div>" +
-      "<div class='barber-stats'><span><b>" + item.count.toLocaleString() + "</b> availed</span><span>PHP <b>" + Math.round(item.revenue).toLocaleString() + "</b> list-price revenue</span></div>";
-    row.querySelector(".barber-rank").appendChild(nameSpan);
-    container.appendChild(row);
-  });
-}
-
-// Minimum visits needed before we trust a frequency estimate
-var MIN_VISITS_FOR_FREQUENCY = 2;
-
-function computeFrequency(client){
-  if(client.visits.length < MIN_VISITS_FOR_FREQUENCY){
-    return { status: "none" };
-  }
-  // visits are stored most-recent-first
-  var sorted = client.visits.slice().reverse(); // oldest -> newest
-  var dates = sorted.map(getVisitDate).filter(Boolean);
-  if(dates.length < MIN_VISITS_FOR_FREQUENCY){
-    return { status: "none" };
-  }
-  var spanMs = dates[dates.length - 1].getTime() - dates[0].getTime();
-  var avgIntervalDays = spanMs / (dates.length - 1) / 86400000;
-  var avgWeeks = avgIntervalDays / 7;
-
-  var lastVisit = dates[dates.length - 1];
-  var nextExpected = new Date(lastVisit.getTime() + avgIntervalDays * 86400000);
-  var daysUntilDue = Math.round((nextExpected.getTime() - Date.now()) / 86400000);
-
-  var status = "ok";
-  if(daysUntilDue < 0) status = "overdue";
-  else if(daysUntilDue <= 7) status = "due";
-
-  return {
-    status: status,
-    avgWeeks: avgWeeks,
-    nextExpected: nextExpected,
-    daysUntilDue: daysUntilDue,
-    lowConfidence: dates.length === 2
-  };
-}
-
-function renderFrequencyReport(clients){
-  var groups = { due: [], ok: [], none: [] };
-
-  clients.forEach(function(c){
-    var freq = computeFrequency(c);
-    if(freq.status === "overdue" || freq.status === "due"){
-      groups.due.push({ client: c, freq: freq });
-    } else if(freq.status === "ok"){
-      groups.ok.push({ client: c, freq: freq });
-    } else {
-      groups.none.push({ client: c, freq: freq });
-    }
-  });
-
-  groups.due.sort(function(a, b){ return a.freq.daysUntilDue - b.freq.daysUntilDue; });
-  groups.ok.sort(function(a, b){ return a.freq.daysUntilDue - b.freq.daysUntilDue; });
-
-  var container = document.getElementById("freq-report");
-  container.innerHTML = "";
-
-  ["due", "ok", "none"].forEach(function(groupKey){
-    var groupDiv = document.createElement("div");
-    groupDiv.className = "freq-group" + (groupKey === "due" ? " active" : "");
-    groupDiv.id = "freq-group-" + groupKey;
-
-    var items = groups[groupKey];
-    if(items.length === 0){
-      var emptyMsg = groupKey === "none"
-        ? "Every client with data has enough visit history for an estimate."
-        : "No clients in this category right now.";
-      groupDiv.innerHTML = "<p class='no-visits'>" + emptyMsg + "</p>";
-      container.appendChild(groupDiv);
-      return;
-    }
-
-    items.forEach(function(item){
-      var c = item.client;
-      var freq = item.freq;
-      var row = document.createElement("div");
-      row.className = "freq-row";
-
-      var pillClass = "status-" + freq.status;
-      var pillText = "";
-      var detailText = "";
-
-      if(freq.status === "none"){
-        pillClass = "status-none";
-        pillText = "Need more data";
-        detailText = client_needMoreDataText(c);
-      } else {
-        var weeksLabel = freq.avgWeeks < 1
-          ? Math.round(freq.avgWeeks * 7) + "-day pattern"
-          : freq.avgWeeks.toFixed(1) + "-week pattern";
-        detailText = "Usually every " + weeksLabel + (freq.lowConfidence ? " (based on only 2 visits)" : "");
-
-        if(freq.status === "overdue"){
-          pillText = Math.abs(freq.daysUntilDue) + "d overdue";
-        } else if(freq.status === "due"){
-          pillText = freq.daysUntilDue === 0 ? "Due today" : "Due in " + freq.daysUntilDue + "d";
-        } else {
-          pillText = "Next in " + freq.daysUntilDue + "d";
-        }
-      }
-
-      row.innerHTML =
-        "<div><div class='freq-name'>" + c.firstName + " " + c.lastName + "</div>" +
-        "<div class='freq-detail'>" + detailText + "</div></div>" +
-        "<span class='status-pill " + pillClass + "'>" + pillText + "</span>";
-      groupDiv.appendChild(row);
-    });
-
-    container.appendChild(groupDiv);
-  });
-}
-
-function client_needMoreDataText(c){
-  var count = c.visits.length;
-  if(count === 0) return "No visits recorded yet";
-  return "Only " + count + " visit" + (count > 1 ? "s" : "") + " recorded — need at least " + MIN_VISITS_FOR_FREQUENCY + " to estimate a pattern";
-}
-
 document.addEventListener("click", function(e){
-  if(e.target.classList.contains("report-tab")){
-    document.querySelectorAll(".report-tab").forEach(function(t){ t.classList.remove("active"); });
-    document.querySelectorAll(".freq-group").forEach(function(g){ g.classList.remove("active"); });
+  if(e.target.classList.contains("report-tab") && e.target.dataset.cfPeriod){
+    document.querySelectorAll("[data-cf-period]").forEach(function(t){ t.classList.remove("active"); });
     e.target.classList.add("active");
-    document.getElementById("freq-group-" + e.target.dataset.group).classList.add("active");
+    currentCfPeriod = e.target.dataset.cfPeriod;
+    renderCashflowOverview();
   }
 });
 
@@ -1421,6 +1171,21 @@ function getWeekStart(date){
 
 function escapeHtml(s){
   return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+function getPeriodRange(period){
+  var now = new Date();
+  if(period === "daily"){
+    return { start: startOfDay(now), end: endOfDay(now) };
+  }
+  if(period === "weekly"){
+    var ws = getWeekStart(now);
+    return { start: ws, end: endOfDay(new Date(ws.getTime() + 6 * 86400000)) };
+  }
+  return {
+    start: new Date(now.getFullYear(), now.getMonth(), 1),
+    end: endOfDay(new Date(now.getFullYear(), now.getMonth() + 1, 0))
+  };
 }
 
 function buildSalesBuckets(dailyTotals, period){
@@ -1459,35 +1224,6 @@ function buildSalesBuckets(dailyTotals, period){
   return buckets;
 }
 
-function computeBarberCountsForPeriod(clients, period){
-  var now = new Date();
-  var rangeStart, rangeEnd;
-  if(period === "daily"){
-    rangeStart = startOfDay(now);
-    rangeEnd = endOfDay(now);
-  } else if(period === "weekly"){
-    rangeStart = getWeekStart(now);
-    rangeEnd = endOfDay(new Date(rangeStart.getTime() + 6 * 86400000));
-  } else {
-    rangeStart = new Date(now.getFullYear(), now.getMonth(), 1);
-    rangeEnd = endOfDay(new Date(now.getFullYear(), now.getMonth() + 1, 0));
-  }
-
-  var counts = {};
-  clients.forEach(function(c){
-    c.visits.forEach(function(v){
-      var d = getVisitDate(v);
-      if(!d || d < rangeStart || d > rangeEnd) return;
-      var name = v.barber || "Unspecified";
-      counts[name] = (counts[name] || 0) + 1;
-    });
-  });
-
-  return Object.keys(counts)
-    .map(function(name){ return { label: name, value: counts[name] }; })
-    .sort(function(a, b){ return b.value - a.value; });
-}
-
 function renderBarChart(containerId, data, opts){
   opts = opts || {};
   var container = document.getElementById(containerId);
@@ -1519,74 +1255,39 @@ function renderBarChart(containerId, data, opts){
   container.innerHTML = "<div style='overflow-x:auto;'>" + svg + "</div>";
 }
 
-function getPeriodRange(period){
-  var now = new Date();
-  if(period === "daily"){
-    return { start: startOfDay(now), end: endOfDay(now) };
-  }
-  if(period === "weekly"){
-    var ws = getWeekStart(now);
-    return { start: ws, end: endOfDay(new Date(ws.getTime() + 6 * 86400000)) };
-  }
-  return {
-    start: new Date(now.getFullYear(), now.getMonth(), 1),
-    end: endOfDay(new Date(now.getFullYear(), now.getMonth() + 1, 0))
-  };
-}
-
-function computeServiceCountsForPeriod(clients, period){
-  var range = getPeriodRange(period);
-  var map = aggregateServices(clients, range.start, range.end);
-  return Object.keys(map)
-    .map(function(name){ return { label: name, value: map[name].count }; })
-    .sort(function(a, b){ return b.value - a.value; });
-}
-
 function renderCharts(){
-  var dailyTotals = {};
+  var revenueTotals = {};
   Object.keys(lastAppSalesByDate).forEach(function(k){
-    dailyTotals[k] = (dailyTotals[k] || 0) + lastAppSalesByDate[k].amount;
+    revenueTotals[k] = (revenueTotals[k] || 0) + lastAppSalesByDate[k].amount;
   });
   Object.keys(manualSalesByDate).forEach(function(k){
-    dailyTotals[k] = (dailyTotals[k] || 0) + manualSalesByDate[k].amount;
+    revenueTotals[k] = (revenueTotals[k] || 0) + manualSalesByDate[k].amount;
   });
 
-  var buckets = buildSalesBuckets(dailyTotals, currentChartPeriod);
+  var buckets = buildSalesBuckets(revenueTotals, currentChartPeriod);
   var salesSubText = currentChartPeriod === "daily"
-    ? "Total sales (app + walk-in) per day, most recent 14 days"
+    ? "Total revenue (check-ins + walk-in) per day, most recent 14 days"
     : currentChartPeriod === "weekly"
-    ? "Total sales (app + walk-in) per week, most recent 12 weeks"
-    : "Total sales (app + walk-in) per month, most recent 12 months";
+    ? "Total revenue (check-ins + walk-in) per week, most recent 12 weeks"
+    : "Total revenue (check-ins + walk-in) per month, most recent 12 months";
   document.getElementById("sales-trend-sub").textContent = salesSubText;
   renderBarChart("sales-trend-chart", buckets, {
     color: "#1360D9",
     valueFormatter: function(v){ return "PHP " + Math.round(v).toLocaleString(); }
   });
 
-  var barberCounts = computeBarberCountsForPeriod(allClients, currentChartPeriod);
-  var barberSubText = currentChartPeriod === "daily"
-    ? "Number of clients served today"
+  var expenseTotals = expenseTotalsByDate();
+  var expBuckets = buildSalesBuckets(expenseTotals, currentChartPeriod);
+  var expSubText = currentChartPeriod === "daily"
+    ? "Total expenses per day, most recent 14 days"
     : currentChartPeriod === "weekly"
-    ? "Number of clients served this week"
-    : "Number of clients served this month";
-  document.getElementById("barber-count-sub").textContent = barberSubText;
-  renderBarChart("barber-count-chart", barberCounts, {
-    color: "#0E4AAD",
-    valueFormatter: function(v){ return String(v); },
-    emptyText: "No visits recorded for this period yet."
-  });
-
-  var serviceCounts = computeServiceCountsForPeriod(allClients, currentChartPeriod);
-  var serviceSubText = currentChartPeriod === "daily"
-    ? "Times each item was availed today"
-    : currentChartPeriod === "weekly"
-    ? "Times each item was availed this week"
-    : "Times each item was availed this month";
-  document.getElementById("service-count-sub").textContent = serviceSubText;
-  renderBarChart("service-count-chart", serviceCounts, {
-    color: "#1F9D55",
-    valueFormatter: function(v){ return String(v); },
-    emptyText: "No service data for this period yet."
+    ? "Total expenses per week, most recent 12 weeks"
+    : "Total expenses per month, most recent 12 months";
+  document.getElementById("expense-trend-sub").textContent = expSubText;
+  renderBarChart("expense-trend-chart", expBuckets, {
+    color: "#D64545",
+    valueFormatter: function(v){ return "PHP " + Math.round(v).toLocaleString(); },
+    emptyText: "No expenses logged for this period yet."
   });
 }
 
@@ -1626,8 +1327,8 @@ function checkForMismatches(clients){
     banner.style.display = "none";
     return;
   }
-  message.textContent = mismatched.length + " client" + (mismatched.length > 1 ? "s have" : " has") +
-    " a points total that doesn't match their recorded visit history (likely from purchases saved before visit tracking was added). You can recalculate to fix this.";
+  message.textContent = mismatched.length + " member" + (mismatched.length > 1 ? "s have" : " has") +
+    " a points total that doesn't match their recorded check-in history. You can recalculate to fix this.";
   banner.style.display = "block";
 }
 
@@ -1654,196 +1355,12 @@ document.getElementById("btn-repair").addEventListener("click", async function()
   }
 });
 
-// ---- Services & prices management ----
+// ---- Discounts management ----
 
-// Same key normalization as the barbers collection: lowercase, spaces -> underscores,
-// and strip characters Firestore doesn't allow in document IDs
-function serviceKey(name){
+// Lowercase, spaces -> underscores, and strip characters Firestore doesn't allow in document IDs
+function slugKey(name){
   return name.toLowerCase().trim().replace(/\s+/g, "_").replace(/[\/\\.#$\[\]]/g, "");
 }
-
-var adminServices = [];
-
-async function loadServicesAdmin(){
-  var fb = window.__firebase;
-  var container = document.getElementById("services-admin-list");
-  try{
-    var snap = await fb.getDocs(fb.collection(fb.firestoreDb, "services"));
-    var list = [];
-    snap.forEach(function(docSnap){
-      var data = docSnap.data();
-      if(data.name && typeof data.price === "number"){
-        list.push({ id: docSnap.id, name: data.name, price: data.price });
-      }
-    });
-    list.sort(function(a, b){ return a.name.localeCompare(b.name); });
-    adminServices = list;
-    renderServicesAdmin();
-  } catch(e){
-    console.error(e);
-    container.innerHTML = "<p class='no-visits'>Couldn't load services. Check your connection and Firestore rules.</p>";
-  }
-}
-
-function renderServicesAdmin(){
-  var container = document.getElementById("services-admin-list");
-  if(adminServices.length === 0){
-    container.innerHTML = "<p class='no-visits'>No services yet. Add them below or import a CSV. Until at least one service exists, the customer app keeps showing the manual amount box.</p>";
-    return;
-  }
-  container.innerHTML = "";
-  adminServices.forEach(function(svc){
-    var row = document.createElement("div");
-    row.className = "svc-admin-row";
-
-    var nameSpan = document.createElement("span");
-    nameSpan.className = "svc-admin-name";
-    nameSpan.textContent = svc.name;
-
-    var right = document.createElement("div");
-    right.className = "svc-admin-right";
-    var priceSpan = document.createElement("span");
-    priceSpan.className = "svc-admin-price";
-    priceSpan.textContent = "PHP " + svc.price.toLocaleString();
-    var delBtn = document.createElement("button");
-    delBtn.className = "svc-delete";
-    delBtn.title = "Remove " + svc.name;
-    delBtn.innerHTML = "&times;";
-    delBtn.addEventListener("click", async function(){
-      if(!confirm("Remove \"" + svc.name + "\" from the service list? Past visit records keep their data.")) return;
-      var fb = window.__firebase;
-      delBtn.disabled = true;
-      try{
-        await fb.deleteDoc(fb.doc(fb.firestoreDb, "services", svc.id));
-        await loadServicesAdmin();
-      } catch(e){
-        console.error(e);
-        delBtn.disabled = false;
-        setSvcStatus("Couldn't remove that service. Check your connection and try again.", true);
-      }
-    });
-
-    right.appendChild(priceSpan);
-    right.appendChild(delBtn);
-    row.appendChild(nameSpan);
-    row.appendChild(right);
-    container.appendChild(row);
-  });
-}
-
-function setSvcStatus(msg, isError){
-  var status = document.getElementById("svc-status");
-  status.textContent = msg;
-  status.className = "save-status " + (isError ? "error" : "success");
-}
-
-document.getElementById("btn-add-service").addEventListener("click", async function(){
-  var fb = window.__firebase;
-  var btn = this;
-  var nameInput = document.getElementById("svc-name-input");
-  var priceInput = document.getElementById("svc-price-input");
-  var name = nameInput.value.trim();
-  var price = parseFloat(priceInput.value);
-
-  if(!name){
-    setSvcStatus("Enter a service or product name.", true);
-    return;
-  }
-  if(isNaN(price) || price < 0){
-    setSvcStatus("Enter a valid price (0 or higher).", true);
-    return;
-  }
-  var key = serviceKey(name);
-  if(!key){
-    setSvcStatus("That name isn't valid. Use letters or numbers.", true);
-    return;
-  }
-
-  btn.disabled = true;
-  btn.textContent = "Saving...";
-  try{
-    await fb.setDoc(fb.doc(fb.firestoreDb, "services", key), { name: name, price: price }, { merge: true });
-    nameInput.value = "";
-    priceInput.value = "";
-    setSvcStatus("\"" + name + "\" saved at PHP " + price.toLocaleString() + ".", false);
-    await loadServicesAdmin();
-  } catch(e){
-    console.error(e);
-    setSvcStatus("Couldn't save. Check your connection and try again.", true);
-  } finally {
-    btn.disabled = false;
-    btn.textContent = "Add service";
-  }
-});
-
-document.getElementById("btn-import-csv").addEventListener("click", function(){
-  var fileInput = document.getElementById("svc-csv-input");
-  var file = fileInput.files && fileInput.files[0];
-  if(!file){
-    setSvcStatus("Choose a CSV file first.", true);
-    return;
-  }
-  var reader = new FileReader();
-  reader.onerror = function(){
-    setSvcStatus("Couldn't read that file. Try saving it again as a plain CSV.", true);
-  };
-  reader.onload = async function(){
-    var fb = window.__firebase;
-    var btn = document.getElementById("btn-import-csv");
-    var lines = String(reader.result).split(/\r?\n/);
-    var entries = [];
-    var skipped = 0;
-
-    lines.forEach(function(line){
-      line = line.trim();
-      if(!line) return;
-      var parts = line.split(",");
-      if(parts.length < 2){ skipped++; return; }
-      // Price is the last column; everything before it is the name
-      // (so names containing commas still import correctly)
-      var price = parseFloat(parts[parts.length - 1].trim().replace(/^["']|["']$/g, ""));
-      var name = parts.slice(0, -1).join(",").trim().replace(/^["']|["']$/g, "");
-      if(!name || isNaN(price) || price < 0){ skipped++; return; }
-      var key = serviceKey(name);
-      if(!key){ skipped++; return; }
-      entries.push({ key: key, name: name, price: price });
-    });
-
-    if(entries.length === 0){
-      setSvcStatus("No valid rows found. Make sure each line looks like: Haircut,150", true);
-      return;
-    }
-
-    btn.disabled = true;
-    btn.textContent = "Importing...";
-    var saved = 0;
-    try{
-      for(var i = 0; i < entries.length; i++){
-        await fb.setDoc(fb.doc(fb.firestoreDb, "services", entries[i].key), {
-          name: entries[i].name,
-          price: entries[i].price
-        }, { merge: true });
-        saved++;
-      }
-      var msg = saved + " item" + (saved > 1 ? "s" : "") + " imported.";
-      // A skipped header row is expected, so only mention skips beyond one
-      if(skipped > 1) msg += " " + skipped + " rows were skipped (missing name or invalid price).";
-      setSvcStatus(msg, false);
-      fileInput.value = "";
-      await loadServicesAdmin();
-    } catch(e){
-      console.error(e);
-      setSvcStatus("Import stopped after " + saved + " item" + (saved === 1 ? "" : "s") + ". Check your connection and try again — re-importing the same file is safe.", true);
-      await loadServicesAdmin();
-    } finally {
-      btn.disabled = false;
-      btn.textContent = "Import CSV";
-    }
-  };
-  reader.readAsText(file);
-});
-
-// ---- Discounts management ----
 
 var adminDiscounts = [];
 
@@ -1883,23 +1400,24 @@ function renderDiscountsAdmin(){
   container.innerHTML = "";
   adminDiscounts.forEach(function(disc){
     var row = document.createElement("div");
-    row.className = "svc-admin-row";
+    row.className = "expense-row";
 
     var nameSpan = document.createElement("span");
-    nameSpan.className = "svc-admin-name";
+    nameSpan.className = "expense-cat";
     nameSpan.textContent = disc.name;
 
     var right = document.createElement("div");
-    right.className = "svc-admin-right";
+    right.className = "expense-right";
     var valueSpan = document.createElement("span");
-    valueSpan.className = "svc-admin-price";
+    valueSpan.style.fontWeight = "600";
+    valueSpan.style.color = "var(--blue-dark)";
     valueSpan.textContent = discountValueLabel(disc);
     var delBtn = document.createElement("button");
-    delBtn.className = "svc-delete";
+    delBtn.className = "expense-delete";
     delBtn.title = "Remove " + disc.name;
     delBtn.innerHTML = "&times;";
     delBtn.addEventListener("click", async function(){
-      if(!confirm("Remove the \"" + disc.name + "\" discount? Past visit records keep their data.")) return;
+      if(!confirm("Remove the \"" + disc.name + "\" discount? Past check-in records keep their data.")) return;
       var fb = window.__firebase;
       delBtn.disabled = true;
       try{
@@ -1948,7 +1466,7 @@ document.getElementById("btn-add-discount").addEventListener("click", async func
     setDiscStatus("A percent discount can't be more than 100.", true);
     return;
   }
-  var key = serviceKey(name);
+  var key = slugKey(name);
   if(!key){
     setDiscStatus("That name isn't valid. Use letters or numbers.", true);
     return;
@@ -1971,12 +1489,220 @@ document.getElementById("btn-add-discount").addEventListener("click", async func
   }
 });
 
+// ---- Expenses management ----
+
+var EXPENSE_CATS = ["Rent", "Utilities", "Staff wages", "Equipment", "Marketing", "Other"];
+
+function setExpenseStatus(msg, isError){
+  var status = document.getElementById("expense-status");
+  status.textContent = msg;
+  status.className = "save-status " + (isError ? "error" : "success");
+}
+
+async function loadExpenses(){
+  var fb = window.__firebase;
+  var container = document.getElementById("expense-list");
+  try{
+    var snap = await fb.getDocs(fb.collection(fb.firestoreDb, "expenses"));
+    var list = [];
+    snap.forEach(function(docSnap){
+      var data = docSnap.data();
+      list.push({ id: docSnap.id, amount: data.amount || 0, category: data.category || "Other", note: data.note || "", dateKey: data.dateKey || "" });
+    });
+    list.sort(function(a, b){ return b.dateKey.localeCompare(a.dateKey); });
+    allExpenses = list;
+    renderExpenseList();
+  } catch(e){
+    console.error(e);
+    container.innerHTML = "<p class='no-visits'>Couldn't load expenses. Check your connection and Firestore rules.</p>";
+  }
+}
+
+function renderExpenseList(){
+  var container = document.getElementById("expense-list");
+  if(allExpenses.length === 0){
+    container.innerHTML = "<p class='no-visits'>No expenses logged yet.</p>";
+    return;
+  }
+  container.innerHTML = "";
+  allExpenses.forEach(function(exp){
+    var row = document.createElement("div");
+    row.className = "expense-row";
+    var infoHtml = "<div class='expense-info'><span class='expense-cat'>" + escapeHtml(exp.category) + "</span>" +
+      "<span class='expense-meta'>" + formatDateKeyDisplay(exp.dateKey) + (exp.note ? " · " + escapeHtml(exp.note) : "") + "</span></div>";
+    row.innerHTML = infoHtml +
+      "<div class='expense-right'><span class='expense-amount'>PHP " + exp.amount.toLocaleString() + "</span></div>";
+    var delBtn = document.createElement("button");
+    delBtn.className = "expense-delete";
+    delBtn.title = "Remove this expense";
+    delBtn.innerHTML = "&times;";
+    delBtn.addEventListener("click", async function(){
+      if(!confirm("Remove this " + exp.category + " expense of PHP " + exp.amount.toLocaleString() + "?")) return;
+      var fb = window.__firebase;
+      delBtn.disabled = true;
+      try{
+        await fb.deleteDoc(fb.doc(fb.firestoreDb, "expenses", exp.id));
+        await loadExpenses();
+        renderCashflowOverview();
+        renderCharts();
+      } catch(e){
+        console.error(e);
+        delBtn.disabled = false;
+        setExpenseStatus("Couldn't remove that expense. Check your connection and try again.", true);
+      }
+    });
+    row.querySelector(".expense-right").appendChild(delBtn);
+    container.appendChild(row);
+  });
+}
+
+document.getElementById("btn-add-expense").addEventListener("click", async function(){
+  var fb = window.__firebase;
+  var btn = this;
+  var category = document.getElementById("expense-category-input").value;
+  var amount = parseFloat(document.getElementById("expense-amount-input").value);
+  var note = document.getElementById("expense-note-input").value.trim();
+  var dateKey = document.getElementById("expense-date-input").value || toDateKey(new Date());
+
+  if(isNaN(amount) || amount <= 0){
+    setExpenseStatus("Enter a valid amount greater than 0.", true);
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = "Saving...";
+  try{
+    await fb.addDoc(fb.collection(fb.firestoreDb, "expenses"), {
+      category: category,
+      amount: amount,
+      note: note || null,
+      dateKey: dateKey,
+      enteredAt: fb.serverTimestamp()
+    });
+    document.getElementById("expense-amount-input").value = "";
+    document.getElementById("expense-note-input").value = "";
+    setExpenseStatus("Expense saved.", false);
+    await loadExpenses();
+    renderCashflowOverview();
+    renderCharts();
+  } catch(e){
+    console.error(e);
+    setExpenseStatus("Couldn't save. Check your connection and try again.", true);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Add expense";
+  }
+});
+
+function expenseTotalsByDate(){
+  var map = {};
+  allExpenses.forEach(function(exp){
+    if(!exp.dateKey) return;
+    map[exp.dateKey] = (map[exp.dateKey] || 0) + exp.amount;
+  });
+  return map;
+}
+
+// ---- Cash flow overview ----
+
+function aggregateRevenueByCategory(rangeStart, rangeEnd){
+  var map = {};
+  allClients.forEach(function(c){
+    c.visits.forEach(function(v){
+      if(!(v.amount > 0)) return;
+      var d = getVisitDate(v);
+      if(!d || d < rangeStart || d > rangeEnd) return;
+      var cat = v.category || "Retail / Other";
+      map[cat] = (map[cat] || 0) + v.amount;
+    });
+  });
+  return map;
+}
+
+async function aggregateManualRevenueByCategory(rangeStart, rangeEnd){
+  var fb = window.__firebase;
+  var map = {};
+  try{
+    var snap = await fb.getDocs(fb.collection(fb.firestoreDb, "manualSales"));
+    snap.forEach(function(docSnap){
+      var data = docSnap.data();
+      if(!data.dateKey) return;
+      var d = parseDateKey(data.dateKey);
+      if(d < startOfDay(rangeStart) || d > rangeEnd) return;
+      var cat = data.category || "Retail / Other";
+      map[cat] = (map[cat] || 0) + (data.amount || 0);
+    });
+  } catch(e){
+    console.error("Couldn't aggregate manual sales:", e);
+  }
+  return map;
+}
+
+function aggregateExpensesByCategory(rangeStart, rangeEnd){
+  var map = {};
+  allExpenses.forEach(function(exp){
+    if(!exp.dateKey) return;
+    var d = parseDateKey(exp.dateKey);
+    if(d < startOfDay(rangeStart) || d > rangeEnd) return;
+    map[exp.category] = (map[exp.category] || 0) + exp.amount;
+  });
+  return map;
+}
+
+function renderBreakdown(containerId, map, emptyText){
+  var container = document.getElementById(containerId);
+  var keys = Object.keys(map).sort(function(a, b){ return map[b] - map[a]; });
+  if(keys.length === 0){
+    container.innerHTML = "<p class='no-visits'>" + emptyText + "</p>";
+    return;
+  }
+  container.innerHTML = "";
+  keys.forEach(function(k){
+    var row = document.createElement("div");
+    row.className = "breakdown-row";
+    row.innerHTML = "<span>" + escapeHtml(k) + "</span><b>PHP " + Math.round(map[k]).toLocaleString() + "</b>";
+    container.appendChild(row);
+  });
+}
+
+async function renderCashflowOverview(){
+  var range = getPeriodRange(currentCfPeriod);
+  var appRevenue = aggregateRevenueByCategory(range.start, range.end);
+  var manualRevenue = await aggregateManualRevenueByCategory(range.start, range.end);
+  var revenueMap = {};
+  Object.keys(appRevenue).forEach(function(k){ revenueMap[k] = (revenueMap[k] || 0) + appRevenue[k]; });
+  Object.keys(manualRevenue).forEach(function(k){ revenueMap[k] = (revenueMap[k] || 0) + manualRevenue[k]; });
+
+  var expenseMap = aggregateExpensesByCategory(range.start, range.end);
+
+  var totalRevenue = Object.keys(revenueMap).reduce(function(s, k){ return s + revenueMap[k]; }, 0);
+  var totalExpense = Object.keys(expenseMap).reduce(function(s, k){ return s + expenseMap[k]; }, 0);
+  var net = totalRevenue - totalExpense;
+
+  document.getElementById("cf-revenue-total").textContent = "PHP " + Math.round(totalRevenue).toLocaleString();
+  document.getElementById("cf-expense-total").textContent = "PHP " + Math.round(totalExpense).toLocaleString();
+  var netEl = document.getElementById("cf-net-total");
+  netEl.textContent = (net < 0 ? "-" : "") + "PHP " + Math.round(Math.abs(net)).toLocaleString();
+  netEl.className = "cf-value " + (net < 0 ? "negative" : "positive");
+
+  renderBreakdown("cf-revenue-breakdown", revenueMap, "No revenue for this period yet.");
+  renderBreakdown("cf-expense-breakdown", expenseMap, "No expenses for this period yet.");
+}
+
 async function loadShopSettings(){
   var fb = window.__firebase;
   try{
     var snap = await fb.getDoc(fb.doc(fb.firestoreDb, "settings", "general"));
-    if(snap.exists() && snap.data().shopName){
-      document.getElementById("shop-name-input").value = snap.data().shopName;
+    if(snap.exists()){
+      var data = snap.data();
+      if(data.shopName) document.getElementById("shop-name-input").value = data.shopName;
+      document.getElementById("base-points-input").value = typeof data.basePointsPerVisit === "number" ? data.basePointsPerVisit : 10;
+      document.getElementById("bonus-points-input").value = typeof data.bonusPerStreakDay === "number" ? data.bonusPerStreakDay : 2;
+      document.getElementById("streak-cap-input").value = typeof data.streakCap === "number" ? data.streakCap : 10;
+    } else {
+      document.getElementById("base-points-input").value = 10;
+      document.getElementById("bonus-points-input").value = 2;
+      document.getElementById("streak-cap-input").value = 10;
     }
   } catch(e){
     console.error("Couldn't load shop settings:", e);
@@ -1988,16 +1714,30 @@ document.getElementById("btn-save-shop-name").addEventListener("click", async fu
   var btn = this;
   var status = document.getElementById("shop-name-status");
   var name = document.getElementById("shop-name-input").value.trim();
+  var basePoints = parseFloat(document.getElementById("base-points-input").value);
+  var bonusPoints = parseFloat(document.getElementById("bonus-points-input").value);
+  var streakCap = parseFloat(document.getElementById("streak-cap-input").value);
+
   if(!name){
-    status.textContent = "Enter a name before saving.";
+    status.textContent = "Enter a gym name before saving.";
+    status.className = "save-status error";
+    return;
+  }
+  if(isNaN(basePoints) || basePoints < 0 || isNaN(bonusPoints) || bonusPoints < 0 || isNaN(streakCap) || streakCap < 0){
+    status.textContent = "Points settings must be 0 or higher.";
     status.className = "save-status error";
     return;
   }
   btn.disabled = true;
   btn.textContent = "Saving...";
   try{
-    await fb.setDoc(fb.doc(fb.firestoreDb, "settings", "general"), { shopName: name }, { merge: true });
-    status.textContent = "Saved. This name will now appear in reward emails.";
+    await fb.setDoc(fb.doc(fb.firestoreDb, "settings", "general"), {
+      shopName: name,
+      basePointsPerVisit: basePoints,
+      bonusPerStreakDay: bonusPoints,
+      streakCap: streakCap
+    }, { merge: true });
+    status.textContent = "Saved. The check-in app now uses these settings.";
     status.className = "save-status success";
   } catch(e){
     console.error(e);
@@ -2005,7 +1745,7 @@ document.getElementById("btn-save-shop-name").addEventListener("click", async fu
     status.className = "save-status error";
   } finally {
     btn.disabled = false;
-    btn.textContent = "Save";
+    btn.textContent = "Save settings";
   }
 });
 </script>
