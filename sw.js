@@ -2,8 +2,8 @@ var CACHE_NAME = "gym-rewards-v5";
 var FILES_TO_CACHE = [
   "./index.html",
   "./manifest.json",
-  "./icons/icon-192.png",
-  "./icons/icon-512.png",
+  "./icon-192.png",
+  "./icon-512.png",
   "./assets/pablings-logo.png"
 ];
 
