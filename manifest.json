@@ -1,13 +1,13 @@
 {
   "name": "Gym Rewards",
   "short_name": "Gym Rewards",
-  "description": "Check in a gym member by mobile number and award rewards points for frequent visits.",
+  "description": "Find a gym member by name, check them in, and award rewards points for frequent visits.",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#141311",
-  "theme_color": "#B7945A",
+  "background_color": "#0A0A0A",
+  "theme_color": "#0A0A0A",
   "icons": [
     {
       "src": "icon-192.png",

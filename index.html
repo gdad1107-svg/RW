@@ -6,7 +6,7 @@
 <title>Gym Rewards</title>
 
 <link rel="manifest" href="manifest.json">
-<meta name="theme-color" content="#B7945A">
+<meta name="theme-color" content="#0A0A0A">
 
 <link rel="icon" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-192.png">
@@ -143,17 +143,17 @@
 </script>
 <style>
   :root{
-    --bg-page:#141311;
-    --bg-card:#1D1B17;
-    --gold:#B7945A;
-    --gold-dark:#96773F;
-    --gold-tint:rgba(183,148,90,0.14);
-    --text-light:#F5F1E8;
-    --text-muted:#9C978C;
+    --bg-page:#0A0A0A;
+    --bg-card:#161616;
+    --accent:#FFFFFF;
+    --accent-dark:#CFCFCF;
+    --accent-tint:rgba(255,255,255,0.10);
+    --text-light:#F5F5F5;
+    --text-muted:#9A9A9A;
     --white:#FFFFFF;
-    --text-dark:#211E19;
-    --border-dark:#332F27;
-    --on-gold:#1A1712;
+    --text-dark:#1A1A1A;
+    --border-dark:#2A2A2A;
+    --on-accent:#0A0A0A;
     --green:#3FBE7A;
     --green-tint:rgba(63,190,122,0.14);
     --red:#E06060;
@@ -224,7 +224,7 @@
   .icon-badge{
     width:56px;height:56px;
     border-radius:50%;
-    background:var(--gold-tint);
+    background:var(--accent-tint);
     display:flex;align-items:center;justify-content:center;
     margin:4px auto 18px;
   }
@@ -270,7 +270,7 @@
     -webkit-appearance:none;
   }
   input::placeholder{color:#ABA595;}
-  input:focus{border-color:var(--gold);}
+  input:focus{border-color:var(--accent);}
   input.error{border-color:var(--red);}
   select{
     width:100%;
@@ -291,7 +291,7 @@
     background-position:right 14px center;
     background-size:16px;
   }
-  select:focus{border-color:var(--gold);}
+  select:focus{border-color:var(--accent);}
   select.error{border-color:var(--red);}
   .currency-field{position:relative;}
   .currency-field span{
@@ -309,8 +309,8 @@
     display:flex;justify-content:center;gap:8px;margin-bottom:16px;flex-wrap:wrap;
   }
   .points-badge{
-    background:var(--gold-tint);
-    color:var(--gold);
+    background:var(--accent-tint);
+    color:var(--accent);
     font-size:12px;
     font-weight:600;
     padding:6px 14px;
@@ -337,14 +337,14 @@
   }
   button:active{transform:scale(0.98);}
   .btn-primary{
-    background:var(--gold);
-    color:var(--on-gold);
+    background:var(--accent);
+    color:var(--on-accent);
     margin-top:6px;
   }
-  .btn-primary:hover{background:var(--gold-dark);}
+  .btn-primary:hover{background:var(--accent-dark);}
   .btn-secondary{
-    background:var(--gold-tint);
-    color:var(--gold);
+    background:var(--accent-tint);
+    color:var(--accent);
   }
   .name-row{display:flex; gap:10px;}
   .name-row .field{flex:1;}
@@ -362,7 +362,7 @@
     cursor:pointer;
   }
   .summary-card{
-    background:var(--gold-tint);
+    background:var(--accent-tint);
     border-radius:16px;
     padding:20px;
     text-align:center;
@@ -370,7 +370,7 @@
   }
   .summary-card .label{
     font-size:12px;
-    color:var(--gold);
+    color:var(--accent);
     font-weight:600;
     margin:0 0 6px;
   }
@@ -395,7 +395,7 @@
     align-items:center;
     justify-content:space-between;
     gap:12px;
-    background:var(--gold-tint);
+    background:var(--accent-tint);
     color:var(--text-light);
     padding:10px 16px;
     border-radius:12px;
@@ -407,12 +407,12 @@
     height:32px;
     padding:0 12px;
     font-size:12px;
-    background:var(--gold);
-    color:var(--on-gold);
+    background:var(--accent);
+    color:var(--on-accent);
   }
   .total-line{
     display:none;
-    background:var(--gold-tint);
+    background:var(--accent-tint);
     border-radius:12px;
     padding:12px 16px;
     margin:4px 0 10px;
@@ -421,7 +421,7 @@
     text-align:center;
     line-height:1.6;
   }
-  .total-line b{color:var(--gold);}
+  .total-line b{color:var(--accent);}
   .membership-status{
     font-size:13px;
     text-align:center;
@@ -450,8 +450,8 @@
     -webkit-tap-highlight-color:transparent;
   }
   .tap-item.selected{
-    border-color:var(--gold);
-    background:var(--gold-tint);
+    border-color:var(--accent);
+    background:var(--accent-tint);
   }
   .tap-item-info{
     display:flex;
@@ -467,11 +467,11 @@
     font-size:12px;
     color:var(--text-muted);
   }
-  .tap-item.selected .tap-item-sub{color:var(--gold);}
+  .tap-item.selected .tap-item-sub{color:var(--accent);}
   .tap-item-value{
     font-size:14px;
     font-weight:700;
-    color:var(--gold);
+    color:var(--accent);
     flex-shrink:0;
   }
   .empty-hint{
@@ -486,7 +486,7 @@
 
 <div class="phone">
   <div class="app-header">
-    <img src="assets/pablings-logo.png" alt="Gym logo" class="brand-logo">
+    <img src="assets/myc-logo.png" alt="MYC Fitness Gym logo" class="brand-logo">
     <h1>Gym Rewards</h1>
     <p>Earn points every time you visit</p>
   </div>
@@ -504,7 +504,7 @@
   <!-- Screen 0b: Staff sign in -->
   <div class="screen screen-hidden" id="screen-login">
     <div class="icon-badge">
-      <svg viewBox="0 0 24 24" fill="none"><rect x="5" y="10" width="14" height="10" rx="2" stroke="#B7945A" stroke-width="1.8"/><path d="M8 10V7a4 4 0 018 0v3" stroke="#B7945A" stroke-width="1.8" stroke-linecap="round"/><circle cx="12" cy="15" r="1.4" fill="#B7945A"/></svg>
+      <svg viewBox="0 0 24 24" fill="none"><rect x="5" y="10" width="14" height="10" rx="2" stroke="#FFFFFF" stroke-width="1.8"/><path d="M8 10V7a4 4 0 018 0v3" stroke="#FFFFFF" stroke-width="1.8" stroke-linecap="round"/><circle cx="12" cy="15" r="1.4" fill="#FFFFFF"/></svg>
     </div>
     <h2>Staff sign in</h2>
     <p class="sub">Sign in with your staff account to check members in</p>
@@ -523,7 +523,7 @@
   <!-- Screen 1: Find a member -->
   <div class="screen screen-hidden" id="screen-search">
     <div class="icon-badge">
-      <svg viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7" stroke="#B7945A" stroke-width="1.8"/><path d="M20 20l-4.3-4.3" stroke="#B7945A" stroke-width="1.8" stroke-linecap="round"/></svg>
+      <svg viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7" stroke="#FFFFFF" stroke-width="1.8"/><path d="M20 20l-4.3-4.3" stroke="#FFFFFF" stroke-width="1.8" stroke-linecap="round"/></svg>
     </div>
     <h2>Find a member</h2>
     <p class="sub">Search by name to check them in</p>
@@ -539,7 +539,7 @@
   <!-- Screen 2: New member registration -->
   <div class="screen screen-hidden" id="screen-new">
     <div class="icon-badge">
-      <svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="3.5" stroke="#B7945A" stroke-width="1.8"/><path d="M5 20c1.5-3.5 4.5-5 7-5s5.5 1.5 7 5" stroke="#B7945A" stroke-width="1.8" stroke-linecap="round"/><path d="M19 8h3M20.5 6.5v3" stroke="#B7945A" stroke-width="1.8" stroke-linecap="round"/></svg>
+      <svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="3.5" stroke="#FFFFFF" stroke-width="1.8"/><path d="M5 20c1.5-3.5 4.5-5 7-5s5.5 1.5 7 5" stroke="#FFFFFF" stroke-width="1.8" stroke-linecap="round"/><path d="M19 8h3M20.5 6.5v3" stroke="#FFFFFF" stroke-width="1.8" stroke-linecap="round"/></svg>
     </div>
     <h2>Welcome, new member</h2>
     <p class="sub">Tell us a bit about you to get started</p>
@@ -572,7 +572,7 @@
   <!-- Screen 3: Check-in -->
   <div class="screen screen-hidden" id="screen-checkin">
     <div class="icon-badge">
-      <svg viewBox="0 0 24 24" fill="none"><path d="M5 12.5l4.5 4.5L19 7.5" stroke="#B7945A" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <svg viewBox="0 0 24 24" fill="none"><path d="M5 12.5l4.5 4.5L19 7.5" stroke="#FFFFFF" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
     </div>
     <h2 id="checkin-greeting">Check in</h2>
     <div class="badge-row" id="badge-row" style="display:none;">
@@ -613,7 +613,7 @@
   <!-- Screen 3b: Package enrollment -->
   <div class="screen screen-hidden" id="screen-package">
     <div class="icon-badge">
-      <svg viewBox="0 0 24 24" fill="none"><rect x="4" y="5" width="16" height="15" rx="2" stroke="#B7945A" stroke-width="1.8"/><path d="M4 9h16M8 3v4M16 3v4" stroke="#B7945A" stroke-width="1.8" stroke-linecap="round"/></svg>
+      <svg viewBox="0 0 24 24" fill="none"><rect x="4" y="5" width="16" height="15" rx="2" stroke="#FFFFFF" stroke-width="1.8"/><path d="M4 9h16M8 3v4M16 3v4" stroke="#FFFFFF" stroke-width="1.8" stroke-linecap="round"/></svg>
     </div>
     <h2>Choose a package</h2>
     <p class="sub">Select a membership package to enroll or renew</p>
