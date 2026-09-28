@@ -1,10 +1,10 @@
-var CACHE_NAME = "gym-rewards-v6";
+var CACHE_NAME = "gym-rewards-v7";
 var FILES_TO_CACHE = [
   "./index.html",
   "./manifest.json",
   "./icon-192.png",
   "./icon-512.png",
-  "./assets/pablings-logo.png"
+  "./assets/myc-logo.png"
 ];
 
 self.addEventListener("install", function(event){
