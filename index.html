@@ -84,6 +84,25 @@
     }
   }
 
+  // Load the membership packages configured in the admin page (e.g. Monthly Unlimited)
+  window.__packagesCatalog = [];
+  async function loadPackages(){
+    try{
+      var snap = await getDocs(collection(firestoreDb, "packages"));
+      var list = [];
+      snap.forEach(function(docSnap){
+        var data = docSnap.data();
+        if(data.name && typeof data.price === "number" && typeof data.durationDays === "number"){
+          list.push({ id: docSnap.id, name: data.name, price: data.price, durationDays: data.durationDays });
+        }
+      });
+      list.sort(function(a, b){ return a.durationDays - b.durationDays; });
+      window.__packagesCatalog = list;
+    } catch(e){
+      console.error("Couldn't load packages:", e);
+    }
+  }
+
   // Load the reward-points rules (points per check-in, streak bonus) configured in the admin page
   window.__rewardSettings = { basePointsPerVisit: 10, bonusPerStreakDay: 2, streakCap: 10 };
   async function loadRewardSettings(){
@@ -105,6 +124,7 @@
     if(user){
       loadShopName();
       loadDiscounts();
+      loadPackages();
       loadRewardSettings();
     }
     if(window.__onAuthChanged) window.__onAuthChanged(user);
@@ -402,6 +422,58 @@
     line-height:1.6;
   }
   .total-line b{color:var(--gold);}
+  .membership-status{
+    font-size:13px;
+    text-align:center;
+    margin:0 0 14px;
+    font-weight:600;
+  }
+  .package-list{
+    display:flex;
+    flex-direction:column;
+    gap:8px;
+    max-height:280px;
+    overflow-y:auto;
+    padding:2px;
+  }
+  .package-item{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:10px;
+    background:var(--bg-page);
+    border:1.5px solid var(--border-dark);
+    border-radius:12px;
+    padding:11px 14px;
+    cursor:pointer;
+    transition:border-color .15s ease, background .15s ease;
+    -webkit-tap-highlight-color:transparent;
+  }
+  .package-item.selected{
+    border-color:var(--gold);
+    background:var(--gold-tint);
+  }
+  .package-info{
+    display:flex;
+    flex-direction:column;
+    gap:2px;
+  }
+  .package-name{
+    font-size:14px;
+    font-weight:600;
+    color:var(--text-light);
+  }
+  .package-duration{
+    font-size:12px;
+    color:var(--text-muted);
+  }
+  .package-item.selected .package-duration{color:var(--gold);}
+  .package-price{
+    font-size:14px;
+    font-weight:700;
+    color:var(--gold);
+    flex-shrink:0;
+  }
 </style>
 </head>
 <body>
@@ -497,6 +569,8 @@
       <span class="points-badge" id="points-badge"></span>
       <span class="streak-badge" id="streak-badge" style="display:none;"></span>
     </div>
+    <p class="membership-status" id="membership-status"></p>
+    <button class="btn-secondary" id="btn-open-package" type="button" style="margin-bottom:14px;">Enroll in a package</button>
     <div class="field">
       <label for="amount-input">Payment collected <span style="font-weight:400; color:var(--text-muted);">(optional — leave blank for a plain check-in)</span></label>
       <div class="currency-field">
@@ -526,12 +600,34 @@
     <button class="btn-primary" id="btn-checkin">Check in</button>
   </div>
 
+  <!-- Screen 3b: Package enrollment -->
+  <div class="screen screen-hidden" id="screen-package">
+    <div class="icon-badge">
+      <svg viewBox="0 0 24 24" fill="none"><rect x="4" y="5" width="16" height="15" rx="2" stroke="#B7945A" stroke-width="1.8"/><path d="M4 9h16M8 3v4M16 3v4" stroke="#B7945A" stroke-width="1.8" stroke-linecap="round"/></svg>
+    </div>
+    <h2>Choose a package</h2>
+    <p class="sub">Select a membership package to enroll or renew</p>
+    <div class="field">
+      <div class="package-list" id="package-list"></div>
+      <p class="error-text" id="package-error"></p>
+    </div>
+    <div class="field" id="pkg-discount-field" style="display:none;">
+      <label for="pkg-discount-select">Discount <span style="font-weight:400; color:var(--text-muted);">(optional)</span></label>
+      <select id="pkg-discount-select">
+        <option value="">No discount</option>
+      </select>
+    </div>
+    <div class="total-line" id="pkg-total-line"></div>
+    <button class="btn-primary" id="btn-enroll">Confirm enrollment</button>
+    <p class="helper-note"><a id="link-cancel-package">Cancel</a></p>
+  </div>
+
   <!-- Screen 4: Confirmation -->
   <div class="screen screen-hidden" id="screen-confirm">
     <div class="icon-badge success">
       <svg viewBox="0 0 24 24" fill="none"><path d="M5 12.5l4.5 4.5L19 7.5" stroke="#1F9D55" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
     </div>
-    <h2>Checked in!</h2>
+    <h2 id="confirm-title">Checked in!</h2>
     <p class="earned-line" id="earned-text"></p>
     <div class="summary-card">
       <p class="label">New total rewards points</p>
@@ -552,9 +648,12 @@ var currentEmail = null;
 var currentFirstName = "";
 var currentStreak = 0;
 var currentLastVisitDateKey = null;
+var currentPackageId = null;
+var currentPackageName = null;
+var currentMembershipExpiry = null;
 
 function show(id){
-  ["screen-loading","screen-login","screen-phone","screen-new","screen-checkin","screen-confirm"].forEach(function(s){
+  ["screen-loading","screen-login","screen-phone","screen-new","screen-checkin","screen-package","screen-confirm"].forEach(function(s){
     document.getElementById(s).classList.toggle("screen-hidden", s !== id);
   });
 }
@@ -573,6 +672,30 @@ function dateKeyMinusDays(key, days){
   var d = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
   d.setDate(d.getDate() - days);
   return toDateKey(d);
+}
+function dateKeyPlusDays(key, days){ return dateKeyMinusDays(key, -days); }
+function formatDateKeyShort(key){
+  var parts = key.split("-");
+  var d = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+  return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+}
+
+// ---- Membership package status ----
+function updateMembershipStatusUI(){
+  var el = document.getElementById("membership-status");
+  if(!currentPackageName){
+    el.textContent = "No active package — pay-per-visit";
+    el.style.color = "var(--text-muted)";
+    return;
+  }
+  var todayKey = toDateKey(new Date());
+  if(currentMembershipExpiry && currentMembershipExpiry < todayKey){
+    el.textContent = currentPackageName + " expired " + formatDateKeyShort(currentMembershipExpiry);
+    el.style.color = "var(--red)";
+  } else {
+    el.textContent = currentPackageName + " active until " + formatDateKeyShort(currentMembershipExpiry);
+    el.style.color = "var(--green)";
+  }
 }
 
 // ---- Auth gate ----
@@ -655,6 +778,9 @@ document.getElementById("btn-phone").addEventListener("click", async function(){
       currentFirstName = record.firstName || "";
       currentStreak = record.currentStreak || 0;
       currentLastVisitDateKey = record.lastVisitDateKey || null;
+      currentPackageId = record.packageId || null;
+      currentPackageName = record.packageName || null;
+      currentMembershipExpiry = record.membershipExpiry || null;
       greeting.textContent = "Welcome back, " + record.firstName;
       badgeRow.style.display = "flex";
       badge.textContent = "Current points: " + currentTotalRewards.toLocaleString();
@@ -664,10 +790,14 @@ document.getElementById("btn-phone").addEventListener("click", async function(){
       } else {
         streakBadge.style.display = "none";
       }
+      updateMembershipStatusUI();
       show("screen-checkin");
     } else {
       currentStreak = 0;
       currentLastVisitDateKey = null;
+      currentPackageId = null;
+      currentPackageName = null;
+      currentMembershipExpiry = null;
       show("screen-new");
     }
   } catch(e){
@@ -717,16 +847,24 @@ document.getElementById("btn-register").addEventListener("click", async function
       emailLower: emailLower,
       totalRewards: 0,
       currentStreak: 0,
-      lastVisitDateKey: null
+      lastVisitDateKey: null,
+      packageId: null,
+      packageName: null,
+      membershipStart: null,
+      membershipExpiry: null
     });
     currentTotalRewards = 0;
     currentEmail = email || null;
     currentFirstName = first;
     currentStreak = 0;
     currentLastVisitDateKey = null;
+    currentPackageId = null;
+    currentPackageName = null;
+    currentMembershipExpiry = null;
     var greeting = document.getElementById("checkin-greeting");
     greeting.textContent = "Registration complete, " + first;
     document.getElementById("badge-row").style.display = "none";
+    updateMembershipStatusUI();
     show("screen-checkin");
   } catch(e){
     err.textContent = "Couldn't save. Check your connection and try again.";
@@ -895,6 +1033,7 @@ document.getElementById("btn-checkin").addEventListener("click", async function(
       lastVisitDateKey: todayKey
     });
     batch.set(newVisitRef, {
+      kind: "checkin",
       amount: amt, // final amount actually paid, after discount
       subtotal: subtotal,
       discount: disc ? { name: disc.name, type: disc.type, value: disc.value, amountOff: amountOff } : null,
@@ -926,6 +1065,7 @@ document.getElementById("btn-checkin").addEventListener("click", async function(
       earnedHtml += "<br><span style='font-size:12px;'>" + disc.name.replace(/</g, "&lt;") +
         " discount applied: −PHP " + amountOff.toLocaleString() + "</span>";
     }
+    document.getElementById("confirm-title").textContent = "Checked in!";
     document.getElementById("earned-text").innerHTML = earnedHtml;
     resetCheckinForm();
     document.getElementById("total-points").textContent = newTotal.toLocaleString();
@@ -963,7 +1103,172 @@ document.getElementById("btn-done").addEventListener("click", function(){
   currentTotalRewards = 0;
   currentStreak = 0;
   currentLastVisitDateKey = null;
+  currentPackageId = null;
+  currentPackageName = null;
+  currentMembershipExpiry = null;
   show("screen-phone");
+});
+
+// ---- Membership package enrollment ----
+var selectedPackageId = null;
+
+function renderPackageList(){
+  var list = window.__packagesCatalog || [];
+  var container = document.getElementById("package-list");
+  container.innerHTML = "";
+  if(list.length === 0){
+    container.innerHTML = "<p style='font-size:12px; color:var(--text-muted); text-align:center; padding:12px 0;'>No packages configured yet. Ask the gym owner to add one in the admin dashboard.</p>";
+    return;
+  }
+  list.forEach(function(pkg){
+    var item = document.createElement("div");
+    item.className = "package-item" + (selectedPackageId === pkg.id ? " selected" : "");
+    item.innerHTML =
+      "<div class='package-info'><span class='package-name'></span><span class='package-duration'>" + pkg.durationDays + "-day access</span></div>" +
+      "<span class='package-price'>PHP " + pkg.price.toLocaleString() + "</span>";
+    item.querySelector(".package-name").textContent = pkg.name;
+    item.addEventListener("click", function(){
+      selectedPackageId = pkg.id;
+      document.getElementById("package-error").textContent = "";
+      renderPackageList();
+      updatePackageTotalLine();
+    });
+    container.appendChild(item);
+  });
+}
+
+function getSelectedPackage(){
+  var list = window.__packagesCatalog || [];
+  for(var i = 0; i < list.length; i++){
+    if(list[i].id === selectedPackageId) return list[i];
+  }
+  return null;
+}
+
+function getPkgSelectedDiscount(){
+  return getDiscountById(document.getElementById("pkg-discount-select").value);
+}
+
+function populatePackageDiscountSelect(){
+  var list = window.__discountsCatalog || [];
+  var field = document.getElementById("pkg-discount-field");
+  var sel = document.getElementById("pkg-discount-select");
+  if(list.length === 0){
+    field.style.display = "none";
+    sel.innerHTML = "<option value=''>No discount</option>";
+    return;
+  }
+  field.style.display = "block";
+  sel.innerHTML = "<option value=''>No discount</option>";
+  list.forEach(function(disc){
+    var opt = document.createElement("option");
+    opt.value = disc.id;
+    opt.textContent = discountLabel(disc);
+    sel.appendChild(opt);
+  });
+}
+
+function updatePackageTotalLine(){
+  var totalLine = document.getElementById("pkg-total-line");
+  var pkg = getSelectedPackage();
+  if(!pkg){
+    totalLine.style.display = "none";
+    return;
+  }
+  var disc = getPkgSelectedDiscount();
+  var off = computeDiscountOff(pkg.price, disc);
+  var total = Math.round((pkg.price - off) * 100) / 100;
+  totalLine.innerHTML = off > 0
+    ? "PHP " + pkg.price.toLocaleString() + " − PHP " + off.toLocaleString() + " discount<br>Total: <b>PHP " + total.toLocaleString() + "</b>"
+    : "Total: <b>PHP " + total.toLocaleString() + "</b>";
+  totalLine.style.display = "block";
+}
+
+document.getElementById("pkg-discount-select").addEventListener("change", updatePackageTotalLine);
+
+document.getElementById("btn-open-package").addEventListener("click", function(){
+  selectedPackageId = null;
+  document.getElementById("package-error").textContent = "";
+  populatePackageDiscountSelect();
+  renderPackageList();
+  updatePackageTotalLine();
+  show("screen-package");
+});
+
+document.getElementById("link-cancel-package").addEventListener("click", function(e){
+  e.preventDefault();
+  show("screen-checkin");
+});
+
+document.getElementById("btn-enroll").addEventListener("click", async function(){
+  var pkg = getSelectedPackage();
+  var err = document.getElementById("package-error");
+  var btn = this;
+  if(!pkg){
+    err.textContent = "Select a package";
+    return;
+  }
+
+  var disc = getPkgSelectedDiscount();
+  var off = computeDiscountOff(pkg.price, disc);
+  var amt = Math.round((pkg.price - off) * 100) / 100;
+
+  var fb = window.__firebase;
+  var todayKey = toDateKey(new Date());
+  var expiryKey = dateKeyPlusDays(todayKey, pkg.durationDays);
+
+  setButtonLoading(btn, true, "Confirm enrollment");
+  try{
+    var memberRef = fb.doc(fb.firestoreDb, "members", currentNumber);
+    var visitsRef = fb.collection(fb.firestoreDb, "members", currentNumber, "visits");
+    var newVisitRef = fb.doc(visitsRef);
+
+    var batch = fb.writeBatch(fb.firestoreDb);
+    batch.update(memberRef, {
+      packageId: pkg.id,
+      packageName: pkg.name,
+      membershipStart: todayKey,
+      membershipExpiry: expiryKey
+    });
+    // Package payments are logged as a "visit" too (kind: enrollment, 0 points) so the
+    // existing revenue/cash flow reports in the admin dashboard pick them up without
+    // needing a second data path — they just aren't counted as a gym check-in.
+    batch.set(newVisitRef, {
+      kind: "enrollment",
+      amount: amt,
+      subtotal: pkg.price,
+      discount: disc ? { name: disc.name, type: disc.type, value: disc.value, amountOff: off } : null,
+      category: "Membership fee",
+      packageId: pkg.id,
+      packageName: pkg.name,
+      durationDays: pkg.durationDays,
+      membershipExpiry: expiryKey,
+      pointsEarned: 0,
+      visitedAt: fb.serverTimestamp()
+    });
+    await batch.commit();
+
+    currentPackageId = pkg.id;
+    currentPackageName = pkg.name;
+    currentMembershipExpiry = expiryKey;
+    updateMembershipStatusUI();
+
+    document.getElementById("confirm-title").textContent = "Enrolled!";
+    var html = "Enrolled in <b>" + pkg.name.replace(/</g, "&lt;") + "</b> · active until " + formatDateKeyShort(expiryKey);
+    html += "<br><span style='font-size:12px;'>PHP " + amt.toLocaleString() + " charged</span>";
+    if(disc && off > 0){
+      html += "<br><span style='font-size:12px;'>" + disc.name.replace(/</g, "&lt;") +
+        " discount applied: −PHP " + off.toLocaleString() + "</span>";
+    }
+    document.getElementById("earned-text").innerHTML = html;
+    document.getElementById("total-points").textContent = currentTotalRewards.toLocaleString();
+    show("screen-confirm");
+  } catch(e){
+    err.textContent = "Couldn't save. Check your connection and try again.";
+    console.error(e);
+  } finally {
+    setButtonLoading(btn, false, "Confirm enrollment");
+  }
 });
 
 // PWA install prompt (Android/Chrome)

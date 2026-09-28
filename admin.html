@@ -512,6 +512,16 @@
     cursor:pointer;
     line-height:1;
   }
+  .pkg-pill{
+    font-size:10px;
+    font-weight:600;
+    padding:2px 8px;
+    border-radius:100px;
+    margin-left:6px;
+    white-space:nowrap;
+  }
+  .pkg-active{background:var(--green-tint); color:var(--green);}
+  .pkg-expired{background:var(--red-tint); color:var(--red);}
 </style>
 </head>
 <body class="locked">
@@ -680,6 +690,21 @@
   </div>
 
   <div class="report-section">
+    <p class="report-title">Membership packages</p>
+    <p class="report-sub">Members can enroll or renew from the check-in app — a package is paid up front and grants access for a fixed number of days, instead of paying per visit.</p>
+    <div id="packages-admin-list">
+      <p class="loading-state">Loading packages...</p>
+    </div>
+    <div style="display:flex; gap:8px; flex-wrap:wrap;">
+      <input id="pkg-name-input" type="text" placeholder="Package name (e.g. Monthly Unlimited)" style="flex:2; min-width:180px; height:42px; border-radius:10px; border:1.5px solid var(--gray-light); padding:0 12px; font-size:13px; font-family:'Inter', sans-serif;">
+      <input id="pkg-duration-input" type="number" min="1" step="1" placeholder="Duration (days)" style="flex:1; min-width:130px; height:42px; border-radius:10px; border:1.5px solid var(--gray-light); padding:0 12px; font-size:13px; font-family:'Inter', sans-serif;">
+      <input id="pkg-price-input" type="number" min="0" step="0.01" placeholder="Price (PHP)" style="flex:1; min-width:120px; height:42px; border-radius:10px; border:1.5px solid var(--gray-light); padding:0 12px; font-size:13px; font-family:'Inter', sans-serif;">
+      <button id="btn-add-package" style="width:auto; height:42px; padding:0 18px; background:var(--blue); color:white; border:none; border-radius:10px; font-size:13px; font-weight:600; font-family:'Inter', sans-serif; cursor:pointer;">Add package</button>
+    </div>
+    <p class="save-status" id="pkg-status"></p>
+  </div>
+
+  <div class="report-section">
     <p class="report-title">Discounts</p>
     <p class="report-sub">These appear as an optional dropdown in the check-in app — e.g. Senior Citizen or PWD (20%), or peso-amount promos. Points aren't affected by discounts; they're earned for the check-in itself.</p>
     <div id="discounts-admin-list">
@@ -769,6 +794,7 @@ window.__onAdminAuth = function(state){
       dashboardStarted = true;
       loadShopSettings();
       loadDiscountsAdmin();
+      loadPackagesAdmin();
       loadClients();
     }
     return;
@@ -845,8 +871,11 @@ async function loadClients(){
       );
       var visitsSnap = await fb.getDocs(visitsQuery);
       var visits = visitsSnap.docs.map(function(v){ return v.data(); });
+      // Package enrollments are stored in the same subcollection (so revenue reports
+      // pick them up) but aren't gym check-ins, so they're excluded from the count.
+      var checkins = visits.filter(function(v){ return v.kind !== "enrollment"; });
 
-      totalVisits += visits.length;
+      totalVisits += checkins.length;
       totalPoints += (data.totalRewards || 0);
 
       clients.push({
@@ -857,8 +886,11 @@ async function loadClients(){
         email: data.email || null,
         totalRewards: data.totalRewards || 0,
         currentStreak: data.currentStreak || 0,
-        visitCount: visits.length,
-        lastVisit: visits.length ? visits[0].visitedAt : null,
+        packageId: data.packageId || null,
+        packageName: data.packageName || null,
+        membershipExpiry: data.membershipExpiry || null,
+        visitCount: checkins.length,
+        lastVisit: checkins.length ? checkins[0].visitedAt : null,
         visits: visits
       });
     }
@@ -912,9 +944,15 @@ function renderList(){
 
     var row = document.createElement("div");
     row.className = "client-row";
+    var pkgPillHtml = "";
+    if(client.packageName){
+      var isExpired = client.membershipExpiry && client.membershipExpiry < toDateKey(new Date());
+      pkgPillHtml = "<span class='pkg-pill " + (isExpired ? "pkg-expired" : "pkg-active") + "'>" +
+        (isExpired ? "Expired: " : "Active: ") + escapeHtml(client.packageName) + "</span>";
+    }
     row.innerHTML =
       "<div class='client-info'>" +
-        "<div class='client-name'>" + client.firstName + " " + client.lastName + "</div>" +
+        "<div class='client-name'>" + client.firstName + " " + client.lastName + pkgPillHtml + "</div>" +
         "<div class='client-meta'>" + client.id + (client.city ? " · " + client.city : "") +
           (client.currentStreak > 1 ? " · " + client.currentStreak + "-day streak" : "") + "</div>" +
       "</div>" +
@@ -941,9 +979,10 @@ function renderList(){
           amountHtml += " <span style='color:var(--green);'>(" + escapeHtml(v.discount.name) +
             " −PHP " + v.discount.amountOff.toLocaleString() + ")</span>";
         }
+        var categoryLabel = v.kind === "enrollment" ? "Enrolled: " + (v.packageName || "package") : (v.category || "Check-in");
         vRow.innerHTML =
           "<span class='visit-date'>" + formatDate(v.visitedAt) + "</span>" +
-          "<span class='visit-category'>" + (v.category || "Check-in") + "</span>" +
+          "<span class='visit-category'>" + escapeHtml(categoryLabel) + "</span>" +
           "<span class='visit-amount'>" + amountHtml + "</span>" +
           "<span class='visit-points'>+" + (v.pointsEarned || 0).toLocaleString() + " pts</span>";
         history.appendChild(vRow);
@@ -1535,6 +1574,131 @@ document.getElementById("btn-add-discount").addEventListener("click", async func
   } finally {
     btn.disabled = false;
     btn.textContent = "Add discount";
+  }
+});
+
+// ---- Membership packages management ----
+
+var adminPackages = [];
+
+async function loadPackagesAdmin(){
+  var fb = window.__firebase;
+  var container = document.getElementById("packages-admin-list");
+  try{
+    var snap = await fb.getDocs(fb.collection(fb.firestoreDb, "packages"));
+    var list = [];
+    snap.forEach(function(docSnap){
+      var data = docSnap.data();
+      if(data.name && typeof data.price === "number" && typeof data.durationDays === "number"){
+        list.push({ id: docSnap.id, name: data.name, price: data.price, durationDays: data.durationDays });
+      }
+    });
+    list.sort(function(a, b){ return a.durationDays - b.durationDays; });
+    adminPackages = list;
+    renderPackagesAdmin();
+  } catch(e){
+    console.error(e);
+    container.innerHTML = "<p class='no-visits'>Couldn't load packages. Check your connection and Firestore rules.</p>";
+  }
+}
+
+function renderPackagesAdmin(){
+  var container = document.getElementById("packages-admin-list");
+  if(adminPackages.length === 0){
+    container.innerHTML = "<p class='no-visits'>No packages yet. Add one below — e.g. Monthly Unlimited, 30 days, PHP 1500.</p>";
+    return;
+  }
+  container.innerHTML = "";
+  adminPackages.forEach(function(pkg){
+    var row = document.createElement("div");
+    row.className = "expense-row";
+
+    var info = document.createElement("div");
+    info.className = "expense-info";
+    info.innerHTML = "<span class='expense-cat'></span><span class='expense-meta'>" + pkg.durationDays + "-day access</span>";
+    info.querySelector(".expense-cat").textContent = pkg.name;
+
+    var right = document.createElement("div");
+    right.className = "expense-right";
+    var priceSpan = document.createElement("span");
+    priceSpan.style.fontWeight = "700";
+    priceSpan.style.color = "var(--blue-dark)";
+    priceSpan.textContent = "PHP " + pkg.price.toLocaleString();
+    var delBtn = document.createElement("button");
+    delBtn.className = "expense-delete";
+    delBtn.title = "Remove " + pkg.name;
+    delBtn.innerHTML = "&times;";
+    delBtn.addEventListener("click", async function(){
+      if(!confirm("Remove the \"" + pkg.name + "\" package? Members already enrolled keep their current expiry date.")) return;
+      var fb = window.__firebase;
+      delBtn.disabled = true;
+      try{
+        await fb.deleteDoc(fb.doc(fb.firestoreDb, "packages", pkg.id));
+        await loadPackagesAdmin();
+      } catch(e){
+        console.error(e);
+        delBtn.disabled = false;
+        setPkgStatus("Couldn't remove that package. Check your connection and try again.", true);
+      }
+    });
+
+    right.appendChild(priceSpan);
+    right.appendChild(delBtn);
+    row.appendChild(info);
+    row.appendChild(right);
+    container.appendChild(row);
+  });
+}
+
+function setPkgStatus(msg, isError){
+  var status = document.getElementById("pkg-status");
+  status.textContent = msg;
+  status.className = "save-status " + (isError ? "error" : "success");
+}
+
+document.getElementById("btn-add-package").addEventListener("click", async function(){
+  var fb = window.__firebase;
+  var btn = this;
+  var nameInput = document.getElementById("pkg-name-input");
+  var durationInput = document.getElementById("pkg-duration-input");
+  var priceInput = document.getElementById("pkg-price-input");
+  var name = nameInput.value.trim();
+  var duration = parseInt(durationInput.value, 10);
+  var price = parseFloat(priceInput.value);
+
+  if(!name){
+    setPkgStatus("Enter a package name.", true);
+    return;
+  }
+  if(!duration || duration <= 0){
+    setPkgStatus("Enter a duration of 1 day or more.", true);
+    return;
+  }
+  if(isNaN(price) || price < 0){
+    setPkgStatus("Enter a valid price (0 or higher).", true);
+    return;
+  }
+  var key = slugKey(name);
+  if(!key){
+    setPkgStatus("That name isn't valid. Use letters or numbers.", true);
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = "Saving...";
+  try{
+    await fb.setDoc(fb.doc(fb.firestoreDb, "packages", key), { name: name, durationDays: duration, price: price }, { merge: true });
+    nameInput.value = "";
+    durationInput.value = "";
+    priceInput.value = "";
+    setPkgStatus("\"" + name + "\" saved.", false);
+    await loadPackagesAdmin();
+  } catch(e){
+    console.error(e);
+    setPkgStatus("Couldn't save. Check your connection and try again.", true);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Add package";
   }
 });
 
