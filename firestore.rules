@@ -1,0 +1,81 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Anyone signed in with a staff or admin account
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    // Signed in AND listed in the "admins" collection
+    // (document ID = the user's UID from Firebase Authentication)
+    function isAdmin() {
+      return signedIn()
+        && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+    }
+
+    // Member records: staff can look up, register, and update members.
+    // Only admins can delete a member.
+    match /members/{memberId} {
+      allow read: if signedIn();
+      allow create, update: if signedIn();
+      allow delete: if isAdmin();
+
+      // Visit history: staff can read and add visits (check-ins and
+      // package enrollments alike). Nobody can edit or delete a visit
+      // from the app (admins only, e.g. to fix a mistake from the
+      // Firebase console or dashboard).
+      match /visits/{visitId} {
+        allow read, create: if signedIn();
+        allow update, delete: if isAdmin();
+      }
+    }
+
+    // Membership packages (e.g. Monthly Unlimited): staff app reads them
+    // for the enroll/renew screen; only admins can add, change, or
+    // remove packages
+    match /packages/{packageId} {
+      allow read: if signedIn();
+      allow write: if isAdmin();
+    }
+
+    // Discounts (e.g. Senior Citizen, PWD): staff app reads them
+    // for the dropdown; only admins can manage them
+    match /discounts/{discountId} {
+      allow read: if signedIn();
+      allow write: if isAdmin();
+    }
+
+    // Walk-in sales log: admin dashboard only
+    match /manualSales/{saleId} {
+      allow read, create: if isAdmin();
+      allow update, delete: if isAdmin();
+    }
+
+    // Expenses log: admin dashboard only
+    match /expenses/{expenseId} {
+      allow read, create: if isAdmin();
+      allow update, delete: if isAdmin();
+    }
+
+    // Shop settings: staff app needs to READ the gym name and reward
+    // rules, but only admins can change them
+    match /settings/{docId} {
+      allow read: if signedIn();
+      allow write: if isAdmin();
+    }
+
+    // Admins list: each user may read ONLY their own entry (so the
+    // dashboard can check "am I an admin?"). Nobody can write to this
+    // from the app — you manage it in the Firebase console.
+    match /admins/{uid} {
+      allow read: if signedIn() && request.auth.uid == uid;
+      allow write: if false;
+    }
+
+    // Everything else: denied
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
