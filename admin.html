@@ -565,6 +565,7 @@
 <main class="app-only">
   <div class="page-tabs">
     <button class="page-tab active" data-page-tab="overview">Overview</button>
+    <button class="page-tab" data-page-tab="members">Members</button>
     <button class="page-tab" data-page-tab="charts">Charts</button>
   </div>
 
@@ -696,6 +697,9 @@
     <p class="save-status" id="disc-status"></p>
   </div>
 
+  </div>
+
+  <div id="page-members" class="page-content">
   <div class="toolbar">
     <input id="search-input" type="text" placeholder="Search by name or mobile number...">
     <select id="sort-select">
@@ -721,6 +725,7 @@
           <button class="period-tab active" data-period="daily">Daily</button>
           <button class="period-tab" data-period="weekly">Weekly</button>
           <button class="period-tab" data-period="monthly">Monthly</button>
+          <button class="period-tab" data-period="annual">Annual</button>
         </div>
       </div>
     </div>
@@ -735,6 +740,12 @@
       <p class="report-title">Expenses trend</p>
       <p class="report-sub" id="expense-trend-sub">Total expenses per day, most recent 14 days</p>
       <div id="expense-trend-chart"></div>
+    </div>
+
+    <div class="report-section">
+      <p class="report-title">Check-ins trend</p>
+      <p class="report-sub" id="visits-trend-sub">Number of check-ins per day, most recent 14 days</p>
+      <div id="visits-trend-chart"></div>
     </div>
   </div>
 </main>
@@ -1209,7 +1220,7 @@ function buildSalesBuckets(dailyTotals, period){
       }
       buckets.push({ label: weekStart.toLocaleDateString("en-US", { month: "short", day: "numeric" }), value: sum });
     }
-  } else { // monthly
+  } else if(period === "monthly"){
     for(var m = 11; m >= 0; m--){
       var monthDate = new Date(today.getFullYear(), today.getMonth() - m, 1);
       var y = monthDate.getFullYear(), mo = monthDate.getMonth();
@@ -1219,6 +1230,15 @@ function buildSalesBuckets(dailyTotals, period){
         if(kd.getFullYear() === y && kd.getMonth() === mo) sum2 += dailyTotals[key];
       });
       buckets.push({ label: monthDate.toLocaleDateString("en-US", { month: "short", year: "numeric" }), value: sum2 });
+    }
+  } else { // annual
+    for(var yr = 5; yr >= 0; yr--){
+      var year = today.getFullYear() - yr;
+      var sum3 = 0;
+      Object.keys(dailyTotals).forEach(function(key){
+        if(parseDateKey(key).getFullYear() === year) sum3 += dailyTotals[key];
+      });
+      buckets.push({ label: String(year), value: sum3 });
     }
   }
   return buckets;
@@ -1255,6 +1275,24 @@ function renderBarChart(containerId, data, opts){
   container.innerHTML = "<div style='overflow-x:auto;'>" + svg + "</div>";
 }
 
+function periodLabel(period, daily, weekly, monthly, annual){
+  return period === "daily" ? daily : period === "weekly" ? weekly : period === "monthly" ? monthly : annual;
+}
+
+// Reuses the visit data already loaded per client — no extra Firestore reads needed
+function computeVisitCountsByDate(){
+  var map = {};
+  allClients.forEach(function(c){
+    c.visits.forEach(function(v){
+      var d = getVisitDate(v);
+      if(!d) return;
+      var key = toDateKey(d);
+      map[key] = (map[key] || 0) + 1;
+    });
+  });
+  return map;
+}
+
 function renderCharts(){
   var revenueTotals = {};
   Object.keys(lastAppSalesByDate).forEach(function(k){
@@ -1265,12 +1303,11 @@ function renderCharts(){
   });
 
   var buckets = buildSalesBuckets(revenueTotals, currentChartPeriod);
-  var salesSubText = currentChartPeriod === "daily"
-    ? "Total revenue (check-ins + walk-in) per day, most recent 14 days"
-    : currentChartPeriod === "weekly"
-    ? "Total revenue (check-ins + walk-in) per week, most recent 12 weeks"
-    : "Total revenue (check-ins + walk-in) per month, most recent 12 months";
-  document.getElementById("sales-trend-sub").textContent = salesSubText;
+  document.getElementById("sales-trend-sub").textContent = periodLabel(currentChartPeriod,
+    "Total revenue (check-ins + walk-in) per day, most recent 14 days",
+    "Total revenue (check-ins + walk-in) per week, most recent 12 weeks",
+    "Total revenue (check-ins + walk-in) per month, most recent 12 months",
+    "Total revenue (check-ins + walk-in) per year, most recent 6 years");
   renderBarChart("sales-trend-chart", buckets, {
     color: "#1360D9",
     valueFormatter: function(v){ return "PHP " + Math.round(v).toLocaleString(); }
@@ -1278,16 +1315,28 @@ function renderCharts(){
 
   var expenseTotals = expenseTotalsByDate();
   var expBuckets = buildSalesBuckets(expenseTotals, currentChartPeriod);
-  var expSubText = currentChartPeriod === "daily"
-    ? "Total expenses per day, most recent 14 days"
-    : currentChartPeriod === "weekly"
-    ? "Total expenses per week, most recent 12 weeks"
-    : "Total expenses per month, most recent 12 months";
-  document.getElementById("expense-trend-sub").textContent = expSubText;
+  document.getElementById("expense-trend-sub").textContent = periodLabel(currentChartPeriod,
+    "Total expenses per day, most recent 14 days",
+    "Total expenses per week, most recent 12 weeks",
+    "Total expenses per month, most recent 12 months",
+    "Total expenses per year, most recent 6 years");
   renderBarChart("expense-trend-chart", expBuckets, {
     color: "#D64545",
     valueFormatter: function(v){ return "PHP " + Math.round(v).toLocaleString(); },
     emptyText: "No expenses logged for this period yet."
+  });
+
+  var visitTotals = computeVisitCountsByDate();
+  var visitBuckets = buildSalesBuckets(visitTotals, currentChartPeriod);
+  document.getElementById("visits-trend-sub").textContent = periodLabel(currentChartPeriod,
+    "Number of check-ins per day, most recent 14 days",
+    "Number of check-ins per week, most recent 12 weeks",
+    "Number of check-ins per month, most recent 12 months",
+    "Number of check-ins per year, most recent 6 years");
+  renderBarChart("visits-trend-chart", visitBuckets, {
+    color: "#0E4AAD",
+    valueFormatter: function(v){ return String(Math.round(v)); },
+    emptyText: "No check-ins recorded for this period yet."
   });
 }
 
