@@ -428,7 +428,7 @@
     margin:0 0 14px;
     font-weight:600;
   }
-  .package-list{
+  .tap-list{
     display:flex;
     flex-direction:column;
     gap:8px;
@@ -436,7 +436,7 @@
     overflow-y:auto;
     padding:2px;
   }
-  .package-item{
+  .tap-item{
     display:flex;
     align-items:center;
     justify-content:space-between;
@@ -449,30 +449,36 @@
     transition:border-color .15s ease, background .15s ease;
     -webkit-tap-highlight-color:transparent;
   }
-  .package-item.selected{
+  .tap-item.selected{
     border-color:var(--gold);
     background:var(--gold-tint);
   }
-  .package-info{
+  .tap-item-info{
     display:flex;
     flex-direction:column;
     gap:2px;
   }
-  .package-name{
+  .tap-item-title{
     font-size:14px;
     font-weight:600;
     color:var(--text-light);
   }
-  .package-duration{
+  .tap-item-sub{
     font-size:12px;
     color:var(--text-muted);
   }
-  .package-item.selected .package-duration{color:var(--gold);}
-  .package-price{
+  .tap-item.selected .tap-item-sub{color:var(--gold);}
+  .tap-item-value{
     font-size:14px;
     font-weight:700;
     color:var(--gold);
     flex-shrink:0;
+  }
+  .empty-hint{
+    font-size:12px;
+    color:var(--text-muted);
+    text-align:center;
+    padding:12px 0;
   }
 </style>
 </head>
@@ -514,19 +520,19 @@
     <button class="btn-primary" id="btn-login">Sign in</button>
   </div>
 
-  <!-- Screen 1: Mobile number -->
-  <div class="screen screen-hidden" id="screen-phone">
+  <!-- Screen 1: Find a member -->
+  <div class="screen screen-hidden" id="screen-search">
     <div class="icon-badge">
-      <svg viewBox="0 0 24 24" fill="none"><rect x="7" y="2" width="10" height="20" rx="2" stroke="#B7945A" stroke-width="1.8"/><path d="M10 18h4" stroke="#B7945A" stroke-width="1.8" stroke-linecap="round"/></svg>
+      <svg viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7" stroke="#B7945A" stroke-width="1.8"/><path d="M20 20l-4.3-4.3" stroke="#B7945A" stroke-width="1.8" stroke-linecap="round"/></svg>
     </div>
-    <h2>Enter your mobile number</h2>
-    <p class="sub">We'll check if you're already a member</p>
+    <h2>Find a member</h2>
+    <p class="sub">Search by name to check them in</p>
     <div class="field">
-      <label for="phone-input">Mobile number</label>
-      <input id="phone-input" type="tel" inputmode="numeric" maxlength="11" placeholder="09XXXXXXXXX" autocomplete="off">
-      <p class="error-text" id="phone-error"></p>
+      <label for="member-search-input">Member name</label>
+      <input id="member-search-input" type="text" placeholder="Start typing a name..." autocomplete="off">
     </div>
-    <button class="btn-primary" id="btn-phone">Continue</button>
+    <div class="tap-list" id="member-search-list"></div>
+    <button class="btn-secondary" id="btn-new-member" type="button" style="margin-top:14px;">+ New member</button>
     <p class="helper-note"><a id="link-signout">Sign out of staff account</a></p>
   </div>
 
@@ -550,6 +556,10 @@
     <div class="field">
       <label for="city-input">City address</label>
       <input id="city-input" type="text" placeholder="Marikina City" autocomplete="off">
+    </div>
+    <div class="field">
+      <label for="new-mobile-input">Mobile number <span style="font-weight:400; color:var(--text-muted);">(optional)</span></label>
+      <input id="new-mobile-input" type="tel" inputmode="numeric" maxlength="11" placeholder="09XXXXXXXXX" autocomplete="off">
     </div>
     <div class="field">
       <label for="email-input">Email address <span style="font-weight:400; color:var(--text-muted);">(optional)</span></label>
@@ -640,9 +650,11 @@
 
 <script>
 // Real Firestore-backed data layer.
-// Collection: "members", document ID = mobile number, fields:
+// Collection: "members" — front desk finds a member by name search (or
+// registers a new one, which gets an auto-generated document ID; mobile
+// number is just an optional contact field, not the lookup key). Fields:
 //   firstName, lastName, city, totalRewards, currentStreak, lastVisitDateKey
-var currentNumber = null;
+var currentNumber = null; // holds the current member's Firestore doc id
 var currentTotalRewards = 0;
 var currentEmail = null;
 var currentFirstName = "";
@@ -653,7 +665,7 @@ var currentPackageName = null;
 var currentMembershipExpiry = null;
 
 function show(id){
-  ["screen-loading","screen-login","screen-phone","screen-new","screen-checkin","screen-package","screen-confirm"].forEach(function(s){
+  ["screen-loading","screen-login","screen-search","screen-new","screen-checkin","screen-package","screen-confirm"].forEach(function(s){
     document.getElementById(s).classList.toggle("screen-hidden", s !== id);
   });
 }
@@ -698,6 +710,121 @@ function updateMembershipStatusUI(){
   }
 }
 
+// ---- Find a member (search by name) ----
+var allMembersCache = [];
+
+async function loadAllMembers(){
+  var fb = window.__firebase;
+  try{
+    var snap = await fb.getDocs(fb.collection(fb.firestoreDb, "members"));
+    var list = [];
+    snap.forEach(function(docSnap){
+      var data = docSnap.data();
+      list.push({
+        id: docSnap.id,
+        firstName: data.firstName || "",
+        lastName: data.lastName || "",
+        email: data.email || null,
+        totalRewards: data.totalRewards || 0,
+        currentStreak: data.currentStreak || 0,
+        lastVisitDateKey: data.lastVisitDateKey || null,
+        packageId: data.packageId || null,
+        packageName: data.packageName || null,
+        membershipExpiry: data.membershipExpiry || null
+      });
+    });
+    list.sort(function(a, b){ return (a.firstName + a.lastName).localeCompare(b.firstName + b.lastName); });
+    allMembersCache = list;
+  } catch(e){
+    console.error("Couldn't load members:", e);
+  }
+}
+
+var MAX_SEARCH_RESULTS = 20;
+
+function renderMemberSearchResults(){
+  var term = document.getElementById("member-search-input").value.trim().toLowerCase();
+  var container = document.getElementById("member-search-list");
+  if(!term){
+    container.innerHTML = "<p class='empty-hint'>Start typing a name to search</p>";
+    return;
+  }
+  var matches = allMembersCache.filter(function(m){
+    return (m.firstName + " " + m.lastName).toLowerCase().indexOf(term) !== -1;
+  });
+  if(matches.length === 0){
+    container.innerHTML = "<p class='empty-hint'>No members found. Try a different spelling, or add them as a new member.</p>";
+    return;
+  }
+  container.innerHTML = "";
+  matches.slice(0, MAX_SEARCH_RESULTS).forEach(function(m){
+    var item = document.createElement("div");
+    item.className = "tap-item";
+    var subText = m.currentStreak > 1 ? m.currentStreak + "-day streak"
+      : m.lastVisitDateKey ? "Last visit " + formatDateKeyShort(m.lastVisitDateKey)
+      : "No check-ins yet";
+    item.innerHTML =
+      "<div class='tap-item-info'><span class='tap-item-title'></span><span class='tap-item-sub'></span></div>" +
+      "<span class='tap-item-value'>" + m.totalRewards.toLocaleString() + " pts</span>";
+    item.querySelector(".tap-item-title").textContent = m.firstName + " " + m.lastName;
+    item.querySelector(".tap-item-sub").textContent = subText;
+    item.addEventListener("click", function(){ selectMember(m); });
+    container.appendChild(item);
+  });
+  if(matches.length > MAX_SEARCH_RESULTS){
+    var more = document.createElement("p");
+    more.className = "empty-hint";
+    more.textContent = (matches.length - MAX_SEARCH_RESULTS) + " more match — keep typing to narrow it down";
+    container.appendChild(more);
+  }
+}
+
+document.getElementById("member-search-input").addEventListener("input", renderMemberSearchResults);
+
+function selectMember(m){
+  currentNumber = m.id;
+  currentTotalRewards = m.totalRewards;
+  currentEmail = m.email;
+  currentFirstName = m.firstName;
+  currentStreak = m.currentStreak;
+  currentLastVisitDateKey = m.lastVisitDateKey;
+  currentPackageId = m.packageId;
+  currentPackageName = m.packageName;
+  currentMembershipExpiry = m.membershipExpiry;
+
+  document.getElementById("checkin-greeting").textContent = "Welcome back, " + m.firstName;
+  var badgeRow = document.getElementById("badge-row");
+  var streakBadge = document.getElementById("streak-badge");
+  badgeRow.style.display = "flex";
+  document.getElementById("points-badge").textContent = "Current points: " + currentTotalRewards.toLocaleString();
+  if(currentStreak > 1){
+    streakBadge.style.display = "inline-block";
+    streakBadge.textContent = currentStreak + "-day streak";
+  } else {
+    streakBadge.style.display = "none";
+  }
+  updateMembershipStatusUI();
+  show("screen-checkin");
+}
+
+async function goToSearchScreen(){
+  document.getElementById("member-search-input").value = "";
+  document.getElementById("member-search-list").innerHTML = "<p class='empty-hint'>Start typing a name to search</p>";
+  show("screen-search");
+  await loadAllMembers();
+  renderMemberSearchResults();
+}
+
+document.getElementById("btn-new-member").addEventListener("click", function(){
+  document.getElementById("new-error").textContent = "";
+  document.getElementById("firstname-input").value = "";
+  document.getElementById("lastname-input").value = "";
+  document.getElementById("city-input").value = "";
+  document.getElementById("new-mobile-input").value = "";
+  document.getElementById("email-input").value = "";
+  show("screen-new");
+});
+
 // ---- Auth gate ----
 // Called by the Firebase module script whenever sign-in state changes.
 window.__onAuthChanged = function(user){
@@ -705,11 +832,11 @@ window.__onAuthChanged = function(user){
     show("screen-login");
     return;
   }
-  // Only jump to the phone screen if we're on the loading or login screen,
+  // Only jump to the search screen if we're on the loading or login screen,
   // so an auth refresh mid-transaction doesn't reset the flow.
   var onLoading = !document.getElementById("screen-loading").classList.contains("screen-hidden");
   var onLogin = !document.getElementById("screen-login").classList.contains("screen-hidden");
-  if(onLoading || onLogin) show("screen-phone");
+  if(onLoading || onLogin) goToSearchScreen();
 };
 
 document.getElementById("btn-login").addEventListener("click", async function(){
@@ -745,78 +872,21 @@ document.getElementById("link-signout").addEventListener("click", function(e){
   window.__auth.signOut(window.__auth.auth);
 });
 
-var phoneInput = document.getElementById("phone-input");
-phoneInput.addEventListener("input", function(e){
+var newMobileInput = document.getElementById("new-mobile-input");
+newMobileInput.addEventListener("input", function(e){
   e.target.value = e.target.value.replace(/[^0-9]/g, "").slice(0, 11);
-  e.target.classList.remove("error");
-  document.getElementById("phone-error").textContent = "";
-});
-
-document.getElementById("btn-phone").addEventListener("click", async function(){
-  var val = phoneInput.value.trim();
-  var err = document.getElementById("phone-error");
-  var btn = this;
-  if(!/^[0-9]{11}$/.test(val)){
-    err.textContent = "Enter a valid 11-digit mobile number";
-    phoneInput.classList.add("error");
-    return;
-  }
-  var fb = window.__firebase;
-  setButtonLoading(btn, true, "Continue");
-  try{
-    var memberRef = fb.doc(fb.firestoreDb, "members", val);
-    var snap = await fb.getDoc(memberRef);
-    currentNumber = val;
-    var greeting = document.getElementById("checkin-greeting");
-    var badgeRow = document.getElementById("badge-row");
-    var badge = document.getElementById("points-badge");
-    var streakBadge = document.getElementById("streak-badge");
-    if(snap.exists()){
-      var record = snap.data();
-      currentTotalRewards = record.totalRewards || 0;
-      currentEmail = record.email || null;
-      currentFirstName = record.firstName || "";
-      currentStreak = record.currentStreak || 0;
-      currentLastVisitDateKey = record.lastVisitDateKey || null;
-      currentPackageId = record.packageId || null;
-      currentPackageName = record.packageName || null;
-      currentMembershipExpiry = record.membershipExpiry || null;
-      greeting.textContent = "Welcome back, " + record.firstName;
-      badgeRow.style.display = "flex";
-      badge.textContent = "Current points: " + currentTotalRewards.toLocaleString();
-      if(currentStreak > 1){
-        streakBadge.style.display = "inline-block";
-        streakBadge.textContent = currentStreak + "-day streak";
-      } else {
-        streakBadge.style.display = "none";
-      }
-      updateMembershipStatusUI();
-      show("screen-checkin");
-    } else {
-      currentStreak = 0;
-      currentLastVisitDateKey = null;
-      currentPackageId = null;
-      currentPackageName = null;
-      currentMembershipExpiry = null;
-      show("screen-new");
-    }
-  } catch(e){
-    err.textContent = "Couldn't reach the database. Check your connection and try again.";
-    console.error(e);
-  } finally {
-    setButtonLoading(btn, false, "Continue");
-  }
 });
 
 document.getElementById("btn-register").addEventListener("click", async function(){
   var first = document.getElementById("firstname-input").value.trim();
   var last = document.getElementById("lastname-input").value.trim();
   var city = document.getElementById("city-input").value.trim();
+  var mobile = newMobileInput.value.trim();
   var email = document.getElementById("email-input").value.trim();
   var err = document.getElementById("new-error");
   var btn = this;
   if(!first || !last || !city){
-    err.textContent = "All fields are required";
+    err.textContent = "First name, last name, and city are required";
     return;
   }
   if(email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){
@@ -837,11 +907,14 @@ document.getElementById("btn-register").addEventListener("click", async function
         return;
       }
     }
-    var memberRef = fb.doc(fb.firestoreDb, "members", currentNumber);
+    // Members are found by name search now, not looked up by phone number,
+    // so a new member just gets an auto-generated document id; the mobile
+    // number (if given) is stored as a plain contact field.
+    var memberRef = fb.doc(fb.collection(fb.firestoreDb, "members"));
     await fb.setDoc(memberRef, {
       firstName: first,
       lastName: last,
-      mobileNumber: currentNumber,
+      mobileNumber: mobile || null,
       city: city,
       email: email || null,
       emailLower: emailLower,
@@ -853,6 +926,7 @@ document.getElementById("btn-register").addEventListener("click", async function
       membershipStart: null,
       membershipExpiry: null
     });
+    currentNumber = memberRef.id;
     currentTotalRewards = 0;
     currentEmail = email || null;
     currentFirstName = first;
@@ -1091,10 +1165,10 @@ document.getElementById("btn-checkin").addEventListener("click", async function(
 });
 
 document.getElementById("btn-done").addEventListener("click", function(){
-  phoneInput.value = "";
   document.getElementById("firstname-input").value = "";
   document.getElementById("lastname-input").value = "";
   document.getElementById("city-input").value = "";
+  document.getElementById("new-mobile-input").value = "";
   document.getElementById("email-input").value = "";
   resetCheckinForm();
   currentNumber = null;
@@ -1106,7 +1180,7 @@ document.getElementById("btn-done").addEventListener("click", function(){
   currentPackageId = null;
   currentPackageName = null;
   currentMembershipExpiry = null;
-  show("screen-phone");
+  goToSearchScreen();
 });
 
 // ---- Membership package enrollment ----
@@ -1117,16 +1191,16 @@ function renderPackageList(){
   var container = document.getElementById("package-list");
   container.innerHTML = "";
   if(list.length === 0){
-    container.innerHTML = "<p style='font-size:12px; color:var(--text-muted); text-align:center; padding:12px 0;'>No packages configured yet. Ask the gym owner to add one in the admin dashboard.</p>";
+    container.innerHTML = "<p class='empty-hint'>No packages configured yet. Ask the gym owner to add one in the admin dashboard.</p>";
     return;
   }
   list.forEach(function(pkg){
     var item = document.createElement("div");
-    item.className = "package-item" + (selectedPackageId === pkg.id ? " selected" : "");
+    item.className = "tap-item" + (selectedPackageId === pkg.id ? " selected" : "");
     item.innerHTML =
-      "<div class='package-info'><span class='package-name'></span><span class='package-duration'>" + pkg.durationDays + "-day access</span></div>" +
-      "<span class='package-price'>PHP " + pkg.price.toLocaleString() + "</span>";
-    item.querySelector(".package-name").textContent = pkg.name;
+      "<div class='tap-item-info'><span class='tap-item-title'></span><span class='tap-item-sub'>" + pkg.durationDays + "-day access</span></div>" +
+      "<span class='tap-item-value'>PHP " + pkg.price.toLocaleString() + "</span>";
+    item.querySelector(".tap-item-title").textContent = pkg.name;
     item.addEventListener("click", function(){
       selectedPackageId = pkg.id;
       document.getElementById("package-error").textContent = "";
