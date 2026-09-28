@@ -319,28 +319,6 @@
     border:none;
   }
   .report-tab.active{background:var(--blue); color:var(--white);}
-  .sales-row{
-    display:flex;
-    align-items:center;
-    justify-content:space-between;
-    padding:10px 0;
-    border-bottom:1px dashed var(--gray-light);
-    font-size:13px;
-    gap:12px;
-    flex-wrap:wrap;
-  }
-  .sales-row:last-child{border-bottom:none;}
-  .sales-row.today{background:var(--blue-tint); border-radius:10px; padding:10px 12px; border-bottom:none;}
-  .sales-date{font-weight:600; min-width:110px;}
-  .sales-breakdown{
-    display:flex;
-    gap:16px;
-    font-size:12px;
-    color:var(--gray);
-    flex-wrap:wrap;
-  }
-  .sales-breakdown b{color:var(--navy);}
-  .sales-total{font-weight:700; font-size:14px; color:var(--blue-dark); min-width:110px; text-align:right;}
   .txn-row{
     display:flex;
     gap:8px;
@@ -637,14 +615,6 @@
         <p class="report-sub" style="margin-bottom:6px; font-weight:600;">Expenses by category</p>
         <div id="cf-expense-breakdown"></div>
       </div>
-    </div>
-  </div>
-
-  <div class="report-section">
-    <p class="report-title">Revenue log</p>
-    <p class="report-sub">Check-in payments combined with manually logged walk-in transactions, by day</p>
-    <div id="sales-report">
-      <p class="loading-state">Loading revenue data...</p>
     </div>
   </div>
 
@@ -1053,43 +1023,10 @@ async function loadManualSales(){
   return map;
 }
 
-function renderSalesReport(appMap, manualMap){
-  var container = document.getElementById("sales-report");
-  var allDateKeys = {};
-  Object.keys(appMap).forEach(function(k){ allDateKeys[k] = true; });
-  Object.keys(manualMap).forEach(function(k){ allDateKeys[k] = true; });
-
-  var dateKeys = Object.keys(allDateKeys).sort().reverse();
-  if(dateKeys.length === 0){
-    container.innerHTML = "<p class='no-visits'>No revenue recorded yet.</p>";
-    return;
-  }
-
-  var todayKey = toDateKey(new Date());
-  container.innerHTML = "";
-  dateKeys.forEach(function(key){
-    var app = appMap[key] || { amount: 0, count: 0 };
-    var manual = manualMap[key] || { amount: 0, count: 0 };
-    var total = app.amount + manual.amount;
-
-    var row = document.createElement("div");
-    row.className = "sales-row" + (key === todayKey ? " today" : "");
-    row.innerHTML =
-      "<span class='sales-date'>" + formatDateKeyDisplay(key) + "</span>" +
-      "<span class='sales-breakdown'>" +
-        "<span>Check-ins: <b>PHP " + app.amount.toLocaleString() + "</b> (" + app.count + ")</span>" +
-        "<span>Walk-in: <b>PHP " + manual.amount.toLocaleString() + "</b> (" + manual.count + ")</span>" +
-      "</span>" +
-      "<span class='sales-total'>PHP " + total.toLocaleString() + "</span>";
-    container.appendChild(row);
-  });
-}
-
 async function refreshSalesReport(){
   var appMap = computeAppSalesByDate(allClients);
   lastAppSalesByDate = appMap;
-  var manualMap = await loadManualSales();
-  renderSalesReport(appMap, manualMap);
+  await loadManualSales();
   renderCashflowOverview();
   renderCharts();
 }
